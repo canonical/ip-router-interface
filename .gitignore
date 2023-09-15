@@ -7,3 +7,5 @@ __pycache__/
 *.py[cod]
 .idea
 .vscode/
+
+tests/integration/v0/*/lib

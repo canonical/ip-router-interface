@@ -83,7 +83,7 @@ RoutingTable = Dict[
 
 class RoutingTableUpdatedEvent(EventBase):
     """
-    Charm event for when the network routing table changes.
+    Charm event for when the network topology changes, all hosts are notified that there are new routes in the databag
     """
 
 
@@ -92,23 +92,7 @@ class NewNetworkRequestEvent(EventBase):
     Charm event for when a host registers a route to an existing interface in the router
     """
 
-    def __init__(self, handle, network=None):
-        super().__init__(handle)
-        self.network = network
-
-    def snapshot(self):
-        return {"data": self.network}
-
-    def restore(self, snapshot):
-        self.network = snapshot["data"]
-
-
-class NewRouteRequestEvent(EventBase):
-    """
-    Charm event for when a host registers a route to an existing interface in the router
-    """
-
-    def __init__(self, handle, routing_table: RoutingTable = None):  # TODO
+    def __init__(self, handle, routing_table: RoutingTable = None):
         super().__init__(handle)
         self.rt = routing_table
 
@@ -120,26 +104,24 @@ class NewRouteRequestEvent(EventBase):
 
 
 class RouterProviderCharmEvents(ObjectEvents):
+    """List of events"""
+
     new_network_request = EventSource(NewNetworkRequestEvent)
-    routing_table_updated = EventSource(RoutingTableUpdatedEvent)
 
 
 class RouterRequirerCharmEvents(ObjectEvents):
+    """Some docstring"""
+
     routing_table_updated = EventSource(RoutingTableUpdatedEvent)
     new_network_request = EventSource(NewNetworkRequestEvent)
 
 
 class RouterProvides(Object):
     """
-    This class is used to manage the routing table of the router provider,
-    to be instantiated by the Provider.
+    This class is used to manage the routing table of the router provider, to be instantiated by the Provider.
 
-    It's used to:
-    * Manage the routing table in the charm itself, by adding and removing
-    new network and route requests by integrated units,
-    * Syncronize the databags of all requiring units with the router table of the
-    provider charm
-
+    It has functionality to do CRUD operations on the internal table, and it automatically
+    keeps the routing table inside all of the charm's relation databags in sync.
     """
 
     _stored = StoredState()
@@ -156,98 +138,36 @@ class RouterProvides(Object):
         )
 
     def _on_ip_router_relation_joined(self, event: RelationJoinedEvent):
-        """
-        When a new unit or app joins the relation, we add its name to the
-        routing table. This allows the user to differentiate between units
-        that don't exist and units that haven't requested a new network yet.
-        """
-        self._stored.routing_table.update({event.unit.name: {"networks": []}})
+        # Assumes the unit name is unique
+        logger.warning(self._stored.routing_table)
+        self._stored.routing_table.update({event.unit.name: {}})
+        logger.warning(self._stored.routing_table)
 
     def _on_new_network_request(self, event: NewNetworkRequestEvent):
-        """This function attempts to add a new network to the routing table.
-        TODO: Figure out a sensible response to failiures due to the race condition.
-
-        Args:
-            network: The requested network, in the format of <gateway>/<mask>
-            eg. 192.168.250.1/24. The IP will be used as the gateway, and the
-            mask will be used as the network.
-
-        Returns:
-            Nothing
-        """
-        unit_name = event.unit.name
-        requested_network: IPv4Interface = IPv4Interface(event.params["network"])
-
         if not self.model.unit.is_leader():
             return
-        # for networks in self._stored.routing_table.values():
-        #     for network_list in networks.values():
-        #         network = IPv4Network(network_list["network"])
-        #         if requested_network.ip in network:
-        #             logger.error("This network is already taken")
-        #             # TODO: This could happen if requests are made in parallel. What to do here?
-        #             return
 
-        # Merge new request with the existing routing table
-        logger.debug(
-            f"\nUpdating\n{self._stored.routing_table}\nWith:\n{event.params}\nFrom: {unit_name}"
-        )
-        new_network = {
-            "network": str(requested_network.network),
-            "gateway": str(requested_network.ip),
-        }
-        self._stored.routing_table[unit_name]["networks"].append(new_network)
+        # TODO: Check that the network isn't taken by any other unit
 
+        # TODO: Merge new request with the existing routing table
+        logger.warning(event)
+        logger.warning(event.unit.name)
+        logger.warning(event.app.name)
+        unit_name = event.unit
+        existing_table = self._stored.routing_table
+        new_request = event.rt
+
+        logger.debug(f"Updating\n{existing_table} \nWith:\n {new_request}\n From: {app_name}")
+
+        existing_table[unit_name].update(new_request)
+
+        # TODO: Sync this table with each relation's application databag
         self._sync_routing_tables()
-        self.on.routing_table_updated.emit()
-
-    def _on_new_route_request(self, event: NewRouteRequestEvent):
-        """This function attempts to add a new route to an existing network.
-
-        Args:
-            existing_network: The requested network, in the format of <ip>/<mask>
-            eg. 192.168.250.0/24. It is enough for the IP to be within the correct
-            network.
-
-            destination: An IP network that will be the destination of the route.
-
-            gateway: The gateway IP for which the user will access the destination route.
-            The gateway IP must be within the existing network.
-
-        Returns:
-            Nothing
-        """
-        unit_name = event.unit.name
-        existing_network: IPv4Interface = IPv4Interface(event.params["existing_network"])
-        destination: IPv4Network = IPv4Network(event.params["destination"])
-        gateway: IPv4Address = IPv4Address(event.params["gateway"])
-
-        # Validate
-        if gateway not in existing_network:
-            logger.error("The path to the new route is not from the given network")
-
-        # Find the relevant network
-        for entry in self._stored.routing_table[unit_name]["networks"]:
-            network = IPv4Network(entry["network"])
-            if existing_network.ip in network:
-                found_entry = entry
-                break
-        else:
-            logger.error("There is no network assigned to unit with the given IP")
-            return
-
-        # Add the route to the network
-        if "routes" not in found_entry.keys():
-            found_entry["routes"] = []
-        found_entry["routes"].append({"destination": str(destination), "gateway": str(gateway)})
-
-        # Sync and update
-        self._sync_routing_tables()
-        self.on.routing_table_updated.emit()
+        self.charm.on.routing_table_updated.emit()
 
     def get_routing_table(self):
         """
-        Read-only way to get the current routing table
+        Read only way to get the current routing table
         """
         return deepcopy(self._stored.routing_table._under)
 
@@ -256,8 +176,8 @@ class RouterProvides(Object):
         Syncs the internal routing table with all of the relation's app databags
         """
         # TODO: Implement
-        ip_router_relations = self.model.relations["ip-router"]
-        logger.warning(ip_router_relations)
+        for relation, relation_data in self.model.relations.items():
+            logger.warning(f"{relation} --- {relation_data}")
 
 
 class RouterRequires(Object):
@@ -277,7 +197,7 @@ class RouterRequires(Object):
         """
         Arguments: IPv4 interface, like '192.168.1.25/24'. It must not be assigned previously.
         """
-        # TODO: Validate if there is no other network with this
+        # TODO: Validate
 
         self.charm.on.new_network_request.emit(network)
 

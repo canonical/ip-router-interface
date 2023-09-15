@@ -1,0 +1,7 @@
+name: ip-router-requirer
+description: ip-router-requirer.
+summary: ip-router-requirer.
+
+requires:
+  ip-router:
+    interface: simple-router-test

@@ -1,0 +1,2 @@
+get-routing-table:
+  description: get the current routing table
