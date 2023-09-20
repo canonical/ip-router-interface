@@ -49,7 +49,7 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
 
     def _action_request_network(self, event: ops.ActionEvent):
         self.RouterRequirer.request_network(IPv4Interface(event.params["network"]))
-        event.set_results({"message": "ok"})
+        event.set_results({"msg": "ok"})
 
     def _action_request_route(self, event: ops.ActionEvent):
         network = IPv4Address(event.params["network"])
