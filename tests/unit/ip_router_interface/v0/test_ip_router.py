@@ -98,7 +98,29 @@ class TestProvider(unittest.TestCase):
         expected_databag = {"networks": json.dumps(network_request)}
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == expected_databag
 
-    def test_provider_adds_multiple_mixed_networks(self):
+    def test_provider_adds_multiple_networks_from_same_relation(self):
+        harness = self._setup()
+
+        # Create a relation
+        rel_id = harness.add_relation("ip-router", "ip-router-requirer")
+        harness.add_relation_unit(rel_id, "ip-router-requirer/0")
+
+        # Update databag
+        network_request = [
+            {"network": "192.168.250.0/24", "gateway": "192.168.250.1"},
+            {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
+        ]
+        harness.update_relation_data(
+            rel_id, "ip-router-requirer", {"networks": json.dumps(network_request)}
+        )
+
+        # Get routing table
+        expected_rt = {"ip-router-requirer": json.dumps(network_request)}
+        assert harness.charm.RouterProvider.get_routing_table() == expected_rt
+        expected_databag = {"networks": json.dumps(network_request)}
+        assert harness.get_relation_data(rel_id, harness.charm.app.name) == expected_databag
+
+    def test_provider_adds_multiple_networks_from_multiple_relations(self):
         harness = self._setup()
 
         # Create relation 1
@@ -214,7 +236,6 @@ class TestProvider(unittest.TestCase):
         assert harness.get_relation_data(rel_b_id, harness.charm.app.name) == expected_databag
 
 
-"""
 class TestRequirer(unittest.TestCase):
     def _setup(self):
         # Set Up
@@ -232,19 +253,120 @@ class TestRequirer(unittest.TestCase):
         rel_id = harness.add_relation("ip-router", "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
-        logger.warning(harness.charm.RouterRequirer.get_routing_table())
-        assert 1 == 2
+        assert harness.charm.RouterRequirer.get_all_networks() == []
 
     def test_request_new_network(self):
-        # TODO: Impl
-        pass
+        harness = self._setup()
+
+        # Create a relation
+        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        harness.add_relation_unit(rel_id, "ip-router-provider/0")
+
+        # Request a network
+        network_request = [
+            {
+                "network": "192.168.252.0/24",
+                "gateway": "192.168.252.1",
+            }
+        ]
+        harness.charm.RouterRequirer.request_network(network_request)
+
+        assert harness.get_relation_data(rel_id, "ip-router-requirer") == {
+            "networks": json.dumps(network_request)
+        }
+
+    def test_request_new_network_multiple(self):
+        harness = self._setup()
+
+        # Create a relation
+        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        harness.add_relation_unit(rel_id, "ip-router-provider/0")
+
+        # Request a network
+        network_request = [
+            {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
+            {"network": "192.168.250.0/24", "gateway": "192.168.250.1"},
+        ]
+        harness.charm.RouterRequirer.request_network(network_request)
+
+        assert harness.get_relation_data(rel_id, "ip-router-requirer") == {
+            "networks": json.dumps(network_request)
+        }
 
     def test_request_new_network_with_ip_conflicts(self):
-        # TODO: Impl
-        pass
+        harness = self._setup()
+
+        # Create a relation
+        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        harness.add_relation_unit(rel_id, "ip-router-provider/0")
+
+        # Create existing network
+        existing_network = [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}]
+        harness.update_relation_data(
+            rel_id, "ip-router-provider", {"networks": json.dumps(existing_network)}
+        )
+
+        # Request a network
+        network_request = [
+            {"network": "192.168.240.0/20", "gateway": "192.168.250.1"},
+        ]
+        harness.charm.RouterRequirer.request_network(network_request)
+        assert harness.get_relation_data(rel_id, "ip-router-requirer") == {
+            "networks": json.dumps([])
+        }
 
     def test_request_new_network_with_unreachable_route(self):
-        # TODO: Impl
-        pass
+        harness = self._setup()
 
-"""
+        # Create a relation
+        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        harness.add_relation_unit(rel_id, "ip-router-provider/0")
+
+        # Create existing network
+        existing_network = [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}]
+        harness.update_relation_data(
+            rel_id, "ip-router-provider", {"networks": json.dumps(existing_network)}
+        )
+
+        # Request a network
+        network_request = [
+            {
+                "network": "192.168.250.0/24",
+                "gateway": "192.168.250.1",
+                "routes": [{"destination": "172.250.0.0/16", "gateway": "192.168.240.3"}],
+            }
+        ]
+        harness.charm.RouterRequirer.request_network(network_request)
+        assert harness.get_relation_data(rel_id, "ip-router-requirer") == {
+            "networks": json.dumps([])
+        }
+
+    def test_request_new_network_multiple_with_one_invalid(self):
+        harness = self._setup()
+
+        # Create a relation
+        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        harness.add_relation_unit(rel_id, "ip-router-provider/0")
+
+        # Create existing network
+        existing_network = [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}]
+        harness.update_relation_data(
+            rel_id, "ip-router-provider", {"networks": json.dumps(existing_network)}
+        )
+
+        # Request a network
+        network_request = [
+            {
+                "network": "192.168.250.0/24",
+                "gateway": "192.168.250.1",
+                "routes": [{"destination": "172.250.0.0/16", "gateway": "192.168.240.3"}],
+            },
+            {
+                "network": "192.168.251.0/24",
+                "gateway": "192.168.251.1",
+            },
+        ]
+        harness.charm.RouterRequirer.request_network(network_request)
+        assert harness.get_relation_data(rel_id, "ip-router-requirer") == {
+            "networks": json.dumps([network_request[1]])
+        }

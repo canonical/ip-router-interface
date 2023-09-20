@@ -1,4 +1,4 @@
-"""
+""" TODO: This whole thing, type hints, docstrings
 Example Usage:
 # ...
 from charms.ip_router_inteface.v0.ip_router_interface import RouterProvides
@@ -54,30 +54,26 @@ import logging, json
 
 logger = logging.getLogger(__name__)
 
-
-RoutingTable = Dict[
-    str,  # Name of the application
-    Dict[  # All networks for this application
-        str,  # always 'networks'
-        List[  # list of networks
+Network = Dict[
+    str,  # 'network' | 'gateway' | 'routes'
+    Union[
+        IPv4Address,  # gateway, ex: '192.168.250.1'
+        IPv4Network,  # network, ex: '192.168.250.0/24'
+        List[  # List of routes
             Dict[
-                str,  # 'network' | 'gateway' | 'routes'
+                str,  # 'destination' | 'gateway'
                 Union[
-                    IPv4Address,  # gateway, ex: '192.168.250.1'
-                    IPv4Network,  # network, ex: '192.168.250.0/24'
-                    List[  # List of routes
-                        Dict[
-                            str,  # 'destination' | 'gateway'
-                            Union[
-                                IPv4Address,  # gateway, ex: '192.168.250.3'
-                                IPv4Network,  # destionation, ex: '172.250.0.0/16'
-                            ],
-                        ]
-                    ],
+                    IPv4Address,  # gateway, ex: '192.168.250.3'
+                    IPv4Network,  # destionation, ex: '172.250.0.0/16'
                 ],
             ]
         ],
     ],
+]
+
+RoutingTable = Dict[
+    str,  # Name of the application
+    Dict[str, List[Network]],  # All networks for this application  # always 'networks'
 ]
 
 
@@ -148,6 +144,7 @@ class RouterProvides(Object):
         routing table.
         """
         self._stored.routing_table.update({event.relation.app.name: {"networks": []}})
+        self._sync_routing_tables()
 
     def _on_ip_router_relation_changed(self, event: RelationChangedEvent):
         """
@@ -218,50 +215,80 @@ class RouterRequires(Object):
         super().__init__(charm, "ip-router")
         self.charm = charm
 
-    def request_network(self, network: IPv4Interface):
+    def request_network(
+        self,
+        networks: List[Network],
+    ):
         """
-        Arguments: IPv4 interface, like '192.168.1.25/24'. It must not be assigned previously.
+        Arguments:
+            TODO: write the docstring
         """
-        # TODO: Validate if there is no other network with this
-
-        if not self.unit.is_leader():
+        if not self.charm.unit.is_leader():
             return
 
-        # Format the input
-        new_network = {"networks": [{"gateway": network.ip, "network": network.network}]}
+        valid_requests = []
+        for network_request in networks:
+            if self._network_is_valid(network_request):
+                valid_requests.append(network_request)
 
-        # Place it in the databags
+        # Place it in the databag
         for relation in self.model.relations.get("ip-router"):
-            relation.data[self.charm.app.name] = new_network
+            relation.data[self.charm.app].update({"networks": json.dumps(valid_requests)})
 
-        self.on.new_network_request.emit()
-
-    def request_route(
-        self, existing_network: IPv4Network, destination: IPv4Network, gateway: IPv4Address
-    ):
-        """Requests a new route from the router provider.
-        The gateway to the route must be within an existing network
-        assigned to the requesting unit.
-
-        Arguments:
-            existing_network: an IPv4 Network that's created by the requesting unit
-            destination: an IPv4 Network that is the route within the gateway
-            gateway: an IPv4 Address that's within the existing network that will be used to route to the destination.
-        """
-        # TODO: validate that gateway is within the existing network
-        # TODO: we can just find it in the RT automatically in the future
-        self.on.new_route_request.emit(
-            {"existing_network": existing_network, "destination": destination, "gateway": gateway}
-        )
-
-    def get_routing_table(self):
+    def get_all_networks(self):
         """
         Finds the relation databag with the provider of ip-router and returns the network table found within
         """
+        if not self.charm.unit.is_leader():
+            return
+
         router_relations = self.model.relations.get("ip-router")
 
-        all_routers = []
+        all_networks = []
         for relation in router_relations:
-            all_routers.append(relation.data[relation.app.name])
+            if networks := relation.data[relation.app].get("networks"):
+                all_networks.extend(json.loads(networks))
+        return all_networks
 
-        return all_routers
+    def _network_is_valid(self, network_request: Network):
+        """This function validates the"""
+        if "gateway" not in network_request:
+            logger.error("Key 'gateway' not found. Skipping entry.")
+            return False
+
+        if "network" not in network_request:
+            logger.error("Key 'network' not found. Skipping entry.")
+            return False
+
+        gateway = IPv4Address(network_request.get("gateway"))
+        network = IPv4Network(network_request.get("network"))
+
+        if gateway not in network:
+            logger.error("Chosen gateway not within given network. Skipping entry.")
+            return False
+
+        for route in network_request.get("routes", []):
+            if "gateway" not in route:
+                logger.error("Key 'gateway' not found in route. Skipping entry")
+                return False
+
+            if "destination" not in route:
+                logger.error("Key 'destination' not found in route. Skipping entry")
+                return False
+            route_gateway = IPv4Address(route["gateway"])
+            if route_gateway not in network:
+                logger.error("There is no route to this destination from the network.")
+                return False
+
+        rt = self.get_all_networks()
+        for entry in rt:
+            existing_network = IPv4Network(entry["network"])
+            new_network = IPv4Network(network_request["network"])
+
+            if new_network.subnet_of(existing_network) or new_network.supernet_of(
+                existing_network
+            ):
+                logger.error("This network is already taken.")
+                return False
+
+        return True
