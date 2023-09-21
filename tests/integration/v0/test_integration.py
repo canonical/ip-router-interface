@@ -2,10 +2,12 @@
 # Copyright 2023 Ubuntu
 # See LICENSE file for licensing details.
 
-import logging, shutil, pytest, os, json
-from time import sleep
+import json
+import logging
+import os
+import shutil
 
-from pytest_operator.plugin import OpsTest
+import pytest
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,9 @@ def copy_lib_content() -> None:
 
 async def validate_routing_table(unit, expected_rt) -> None:
     action = await unit.run_action(action_name="get-routing-table")
-    action_output = await ops_test.model.get_action_output(action_uuid=action.entity_id, wait=60)
+    action_output = await ops_test.model.get_action_output(  # noqa
+        action_uuid=action.entity_id, wait=60
+    )
     assert json.loads(action_output["msg"]) == expected_rt
 
 
@@ -75,9 +79,7 @@ class TestIntegration:
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == {
-            f"{IP_ROUTER_REQUIRER_APP_NAME}-a/0": {"networks": []}
-        }
+        assert json.loads(action_output["msg"]) == {f"{IP_ROUTER_REQUIRER_APP_NAME}-a": []}
 
     @pytest.mark.abort_on_fail
     async def test_given_network_request_provider_implements_and_requirer_sees(self, ops_test):
@@ -95,13 +97,20 @@ class TestIntegration:
         )
         assert action_output["msg"] == "ok"
 
+        # Wait for the model to finish executing `relation-changed`
+        await ops_test.model.wait_for_idle(
+            apps=[f"{IP_ROUTER_REQUIRER_APP_NAME}-a", IP_ROUTER_PROVIDER_APP_NAME],
+            status="active",
+            timeout=1000,
+        )
+
         # Run a "get-routing-table" action on the provider charm
         provider_unit = ops_test.model.units[f"{IP_ROUTER_PROVIDER_APP_NAME}/0"]
-        action = await provider_unit.run_action(action_name="get-routing-table")
+        action = await provider_unit.run_action(action_name="get-flattened-routing-table")
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == json.dumps(requested_network)
+        assert json.loads(action_output["msg"]) == requested_network
 
     @pytest.mark.abort_on_fail
     async def test_full_end2end_test(self, ops_test):
@@ -134,7 +143,12 @@ class TestIntegration:
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == {json.loads([])}
+        assert json.loads(action_output["msg"]) == {
+            "ip-router-requirer-a": json.dumps(
+                [{"network": "192.168.250.0/24", "gateway": "192.168.250.1"}]
+            ),
+            "ip-router-requirer-b": [],
+        }
 
         requirer_unit_1 = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}-a/0"]
         requirer_unit_2 = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}-b/0"]
@@ -145,50 +159,86 @@ class TestIntegration:
             action_name="request-network", network=json.dumps(requested_network)
         )
 
+        # Wait for all apps to be done
+        await ops_test.model.wait_for_idle(
+            apps=[
+                f"{IP_ROUTER_REQUIRER_APP_NAME}-a",
+                f"{IP_ROUTER_REQUIRER_APP_NAME}-b",
+                IP_ROUTER_PROVIDER_APP_NAME,
+            ],
+            status="active",
+            timeout=1000,
+        )
+
         # assert there is a new network in all charms
-        expected_rt = [
+        expected_flat_table = [
             {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
         ]
+        expected_rt = {
+            "ip-router-requirer-a": json.dumps(
+                [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}]
+            ),
+            "ip-router-requirer-b": [],
+        }
 
         action = await provider_unit.run_action(action_name="get-routing-table")
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == json.dumps(expected_rt)
+        assert json.loads(action_output["msg"]) == expected_rt
         action = await requirer_unit_1.run_action(action_name="get-routing-table")
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == json.dumps(expected_rt)
+        assert json.loads(action_output["msg"]) == expected_flat_table
         action = await requirer_unit_2.run_action(action_name="get-routing-table")
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == json.dumps(expected_rt)
+        assert json.loads(action_output["msg"]) == expected_flat_table
 
         # requirer2 sends a network request
         requested_network = [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}]
         action = await requirer_unit_2.run_action(
-            action_name="request-network", network_request=json.dumps(requested_network)
+            action_name="request-network", network=json.dumps(requested_network)
         )
 
-        expected_rt = [
+        # Wait for all apps to be done
+        await ops_test.model.wait_for_idle(
+            apps=[
+                f"{IP_ROUTER_REQUIRER_APP_NAME}-a",
+                f"{IP_ROUTER_REQUIRER_APP_NAME}-b",
+                IP_ROUTER_PROVIDER_APP_NAME,
+            ],
+            status="active",
+            timeout=1000,
+        )
+
+        expected_flat_table = [
             {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
             {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
         ]
+        expected_rt = {
+            "ip-router-requirer-a": json.dumps(
+                [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}]
+            ),
+            "ip-router-requirer-b": json.dumps(
+                [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}]
+            ),
+        }
 
         action = await provider_unit.run_action(action_name="get-routing-table")
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == json.dumps(expected_rt)
+        assert json.loads(action_output["msg"]) == expected_rt
         action = await requirer_unit_1.run_action(action_name="get-routing-table")
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == json.dumps(expected_rt)
+        assert json.loads(action_output["msg"]) == expected_flat_table
         action = await requirer_unit_2.run_action(action_name="get-routing-table")
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == json.dumps(expected_rt)
+        assert json.loads(action_output["msg"]) == expected_flat_table

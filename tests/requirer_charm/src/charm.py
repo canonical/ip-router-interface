@@ -12,12 +12,11 @@ develop a new k8s charm using the Operator Framework:
 https://juju.is/docs/sdk/create-a-minimal-kubernetes-charm
 """
 
-import logging, json
-from ipaddress import IPv4Interface, IPv4Network, IPv4Address
+import json
+import logging
 
 import ops
-
-from charms.ip_router_interface.v0.ip_router_interface import *
+from charms.ip_router_interface.v0.ip_router_interface import *  # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.RouterRequirer = RouterRequires(charm=self)
+        self.RouterRequirer = RouterRequires(charm=self)  # noqa
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.ip_router_relation_joined, self._on_relation_joined)
 
@@ -43,7 +42,7 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus("Ready to Require")
 
     def _action_get_routing_table(self, event: ops.ActionEvent):
-        rt = self.RouterRequirer.get_routing_table()
+        rt = self.RouterRequirer.get_all_networks()
         event.set_results({"msg": json.dumps(rt)})
 
     def _action_request_network(self, event: ops.ActionEvent):

@@ -3,7 +3,7 @@
 
 """Library for the ip-router integration
 
-This library contains ther Requires and Provides classes for interactions through the 
+This library contains the Requires and Provides classes for interactions through the 
 ip-router interface
 
 ## Getting Started
@@ -101,7 +101,7 @@ LIBPATCH = 1
 from ipaddress import IPv4Address, IPv4Network
 from copy import deepcopy
 from typing import Dict, List, Union
-from ops.framework import Object
+from ops.framework import Object, EventSource, EventBase, ObjectEvents
 from ops.charm import CharmBase
 from ops import RelationJoinedEvent, RelationChangedEvent, RelationDepartedEvent, StoredState
 import logging, json
@@ -118,7 +118,7 @@ Network = Dict[
                 str,  # 'destination' | 'gateway'
                 Union[
                     IPv4Address,  # gateway, ex: '192.168.250.3'
-                    IPv4Network,  # destionation, ex: '172.250.0.0/16'
+                    IPv4Network,  # destination, ex: '172.250.0.0/16'
                 ],
             ]
         ],
@@ -131,13 +131,23 @@ RoutingTable = Dict[
 ]
 
 
+class RoutingTableUpdatedEvent(EventBase):
+    """
+    Charm event for when a host registers a route to an existing interface in the router
+    """
+
+
+class RouterProviderCharmEvents(ObjectEvents):
+    routing_table_updated = EventSource(RoutingTableUpdatedEvent)
+
+
 class RouterProvides(Object):
     """This class is used to manage the routing table of the router provider.
 
     It's capabilities are to:
     * Manage the routing table in the charm itself, by adding and removing
     new network and route requests by integrated units,
-    * Syncronize the databags of all requiring units with the router table of the
+    * Synchronize the databags of all requiring units with the router table of the
     provider charm
 
     Attributes:
@@ -147,6 +157,7 @@ class RouterProvides(Object):
             The persistent state that keeps the internal routing table.
     """
 
+    on = RouterProviderCharmEvents()
     _stored = StoredState()
 
     def __init__(self, charm: CharmBase):
@@ -165,7 +176,7 @@ class RouterProvides(Object):
 
     def _on_ip_router_relation_joined(self, event: RelationJoinedEvent):
         """When a new unit or app joins the relation, add its name to the routing table"""
-        self._stored.routing_table.update({event.relation.app.name: {"networks": []}})
+        self._stored.routing_table.update({event.relation.app.name: []})
         self._sync_routing_tables()
 
     def _on_ip_router_relation_changed(self, event: RelationChangedEvent):
@@ -175,9 +186,15 @@ class RouterProvides(Object):
         if not self.charm.unit.is_leader():
             return
 
+        if "networks" not in event.relation.data[event.relation.app]:
+            return
+
         new_network = event.relation.data[event.relation.app]["networks"]
+        if new_network == self._stored.routing_table[event.relation.app.name]:
+            return
         self._stored.routing_table[event.relation.app.name] = new_network
         self._sync_routing_tables()
+        self.on.routing_table_updated.emit()
 
     def _on_ip_router_relation_departed(self, event: RelationDepartedEvent):
         """If an application has completely departed the relation, remove it
@@ -265,7 +282,10 @@ class RouterRequires(Object):
 
         # Place it in the databags
         for relation in ip_router_relations:
+            logger.warning(relation.data)
+            logger.warning(relation.data[self.charm.app])
             relation.data[self.charm.app].update({"networks": json.dumps(networks)})
+            logger.warning(relation.data[self.charm.app])
 
     def get_all_networks(self) -> List[Network]:
         """Fetches combined routing tables made available by ip-router providers

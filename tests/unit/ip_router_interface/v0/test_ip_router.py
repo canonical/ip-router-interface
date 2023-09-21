@@ -2,9 +2,13 @@
 # See LICENSE file for licensing details.
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
-import unittest, logging, os, shutil, json
+import json
+import logging
+import os
+import shutil
+import unittest
 from itertools import chain
-from unittest.mock import Mock
+
 from ops.testing import Harness
 
 from tests.provider_charm.src.charm import SimpleIPRouteProviderCharm
@@ -51,7 +55,7 @@ class TestProvider(unittest.TestCase):
         harness.add_relation_unit(rel_id, "ip-router-requirer/0")
 
         # Get routing table
-        expected_rt = {"ip-router-requirer": {"networks": []}}
+        expected_rt = {"ip-router-requirer": []}
         assert harness.charm.RouterProvider.get_routing_table() == expected_rt
 
     def test_provider_adds_new_network(self):
