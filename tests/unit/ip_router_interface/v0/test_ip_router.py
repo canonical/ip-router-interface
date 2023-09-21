@@ -454,7 +454,6 @@ class TestRequirer(unittest.TestCase):
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
     def test_request_new_network_no_gateway(self):
-        # TODO
         harness = self._setup()
 
         # Create a relation
@@ -491,7 +490,6 @@ class TestRequirer(unittest.TestCase):
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
     def test_request_new_network_no_route_destination(self):
-        # TODO
         harness = self._setup()
 
         # Create a relation
@@ -514,7 +512,6 @@ class TestRequirer(unittest.TestCase):
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
     def test_request_new_network_no_route_gateway(self):
-        # TODO
         harness = self._setup()
 
         # Create a relation
