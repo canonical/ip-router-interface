@@ -1,38 +1,92 @@
-""" TODO: This whole thing, type hints, docstrings
-Example Usage:
-# ...
-from charms.ip_router_inteface.v0.ip_router_interface import RouterProvides
-#...
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
 
-class SpecialCharm(CharmBase):
-    # ...
-    on = RouterProviderCharmEvents()
-    # ...
+"""Library for the ip-router integration
+
+This library contains ther Requires and Provides classes for interactions through the 
+ip-router interface
+
+## Getting Started
+
+From a charm directory, fetch the library using `charmcraft`:
+
+```shell
+charmcraft fetch-lib charms.ip_router_interface.v0.ip_router_interface TODO: Verify this works
+```
+
+### Provider charm
+This example provider charm is all we need to listen to ip-router requirer requests:
+
+```python
+import logging, json
+import ops
+from charms.ip_router_interface.v0.ip_router_interface import *
+
+class SimpleIPRouteProviderCharm(ops.CharmBase):
+
     def __init__(self, *args):
         super().__init__(*args)
-        # ...
-        self.demo = RouterProvides(self, self._stored)
-        self.framework.observe(self.on.new_network_request, self._on_new_network_request)
-        # ...
+        self.RouterProvider = RouterProvides(charm=self)
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.ip_router_relation_joined, self._on_relation_joined)
 
-This is a placeholder docstring for this charm library. Docstrings are
-presented on Charmhub and updated whenever you push a new version of the
-library.
+    def _on_install(self, event: ops.InstallEvent):
+        pass
 
-Complete documentation about creating and documenting libraries can be found
-in the SDK docs at https://juju.is/docs/sdk/libraries.
+    def _on_relation_joined(self, event: ops.RelationJoinedEvent):
+        self.unit.status = ops.ActiveStatus("Ready to Provide")
 
-See `charmcraft publish-lib` and `charmcraft fetch-lib` for details of how to
-share and consume charm libraries. They serve to enhance collaboration
-between charmers. Use a charmer's libraries for classes that handle
-integration with their charm.
 
-Bear in mind that new revisions of the different major API versions (v0, v1,
-v2 etc) are maintained independently.  You can continue to update v0 and v1
-after you have pushed v3.
+if __name__ == "__main__":  # pragma: nocover
+    ops.main(SimpleIPRouteProviderCharm)  # type: ignore
+```
 
-Markdown is supported, following the CommonMark specification.
-"""
+### Requirer charm
+This example requirer charm shows a flow where the user can run actions to request
+new networks and get the available networks:
+
+```python
+import logging, json
+import ops
+
+from charms.ip_router_interface.v0.ip_router_interface import *
+
+class SimpleIPRouteRequirerCharm(ops.CharmBase):
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.RouterRequirer = RouterRequires(charm=self)
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.ip_router_relation_joined, self._on_relation_joined)
+
+        self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
+        self.framework.observe(self.on.request_network_action, self._action_request_network)
+
+    def _on_install(self, event: ops.InstallEvent):
+        pass
+
+    def _on_relation_joined(self, event: ops.RelationJoinedEvent):
+        self.unit.status = ops.ActiveStatus("Ready to Require")
+
+    def _action_get_routing_table(self, event: ops.ActionEvent):
+        rt = self.RouterRequirer.get_routing_table()
+        event.set_results({"msg": json.dumps(rt)})
+
+    def _action_request_network(self, event: ops.ActionEvent):
+        self.RouterRequirer.request_network(event.params["network"])
+        event.set_results({"msg": "ok"})
+
+
+if __name__ == "__main__":  # pragma: nocover
+    ops.main.main(SimpleIPRouteRequirerCharm)  # type: ignore
+```
+
+You can relate both charms by running:
+
+```bash
+juju integrate <ip-router provider charm> <ip-router requirer charm>
+```
+"""  # noqa: D405, D410, D411, D214, D416
 
 # The unique Charmhub library identifier, never change it
 LIBID = "8bed752769244d9ba01c61d5647683cf"
@@ -44,13 +98,14 @@ LIBAPI = 0
 # to 0 if you are raising the major API version
 LIBPATCH = 1
 
-from ipaddress import IPv4Interface, IPv4Address, IPv4Network
+from ipaddress import IPv4Address, IPv4Network
 from copy import deepcopy
 from typing import Dict, List, Union
 from ops.framework import EventBase, Object, EventSource, ObjectEvents
-from ops.charm import CharmBase, CharmEvents
+from ops.charm import CharmBase
 from ops import RelationJoinedEvent, RelationChangedEvent, RelationDepartedEvent, StoredState
 import logging, json
+
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +128,7 @@ Network = Dict[
 
 RoutingTable = Dict[
     str,  # Name of the application
-    Dict[str, List[Network]],  # All networks for this application  # always 'networks'
+    List[Network],  # All networks for this application
 ]
 
 
@@ -108,24 +163,24 @@ class RouterRequirerCharmEvents(ObjectEvents):
 
 
 class RouterProvides(Object):
-    """
-    This class is used to manage the routing table of the router provider,
-    to be instantiated by the Provider.
+    """This class is used to manage the routing table of the router provider.
 
-    It's used to:
+    It's capabilities are to:
     * Manage the routing table in the charm itself, by adding and removing
     new network and route requests by integrated units,
     * Syncronize the databags of all requiring units with the router table of the
     provider charm
 
+    Attributes:
+        charm: The Charm object that instantiates this class
+        _stored: The persistent state that keeps the internal routing table.
     """
 
     _stored = StoredState()
     on = RouterProviderCharmEvents()
 
     def __init__(self, charm: CharmBase):
-        """Init."""
-        super().__init__(charm, "router")
+        super().__init__(charm, "ip-router")
         self.charm = charm
         self._stored.set_default(routing_table={})
         self.framework.observe(
@@ -139,47 +194,38 @@ class RouterProvides(Object):
         )
 
     def _on_ip_router_relation_joined(self, event: RelationJoinedEvent):
-        """
-        When a new unit or app joins the relation, we add its name to the
-        routing table.
-        """
+        """When a new unit or app joins the relation, add its name to the routing table"""
         self._stored.routing_table.update({event.relation.app.name: {"networks": []}})
         self._sync_routing_tables()
 
     def _on_ip_router_relation_changed(self, event: RelationChangedEvent):
-        """
-        This function updates the internal routing table state to reflect changes in
+        """Update the internal routing table state to reflect changes in
         requirer units' new network requests.
         """
         if not self.charm.unit.is_leader():
             return
 
         new_network = event.relation.data[event.relation.app]["networks"]
-
-        # Update the routing table
         self._stored.routing_table[event.relation.app.name] = new_network
-
-        # Sync and update
         self._sync_routing_tables()
 
     def _on_ip_router_relation_departed(self, event: RelationDepartedEvent):
-        """
-        If an application has completely departed the relation, remove it
+        """If an application has completely departed the relation, remove it
         from the routing table.
         """
         if len(event.relation.units) == 0:
             self._stored.routing_table.pop(event.app.name)
             self._sync_routing_tables()
 
-    def get_routing_table(self):
-        """
-        Read-only way to get the current routing table
-        """
-        return deepcopy(self._stored.routing_table._under)
+    def get_routing_table(self) -> RoutingTable:
+        """Read-only way to get the current routing table"""
+        return deepcopy(self._stored.routing_table._under)  # RFC: Is there a better way?
 
-    def get_flattened_routing_table(self):
-        """
-        Read-only routing table that's flattened to fit the specification
+    def get_flattened_routing_table(self) -> List[Network]:
+        """Returns a read-only internal routing table that's flattened
+
+        Returns:
+            A list of objects of type `Network`
         """
         internal_rt = self.get_routing_table()
         final_rt = []
@@ -191,10 +237,8 @@ class RouterProvides(Object):
 
         return final_rt
 
-    def _sync_routing_tables(self):
-        """
-        Syncs the internal routing table with all of the relation's app databags
-        """
+    def _sync_routing_tables(self) -> None:
+        """Syncs the internal routing table with all of the requirer's app databags"""
         ip_router_relations = self.model.relations["ip-router"]
         for relation in ip_router_relations:
             relation.data[self.charm.app].update(
@@ -203,13 +247,17 @@ class RouterProvides(Object):
 
 
 class RouterRequires(Object):
-    """
-    This class is used to interact with the routing information within the databag.
-    Unlike the router, this class holds no internal state, and is only used to keep
-    router requirer functionality in a logical group.
+    """ip-router requirer class to be instantiated by charms that require routing
+
+    This class provides methods to request a new network, and read the available
+    network from the router providers. These should be used exclusively to
+    interact with the relation.
+
+    Attributes:
+        charm: The Charm object that instantiates this class.
     """
 
-    on = RouterRequirerCharmEvents()
+    on = RouterRequirerCharmEvents()  # RFC: Is this actually needed?
 
     def __init__(self, charm: CharmBase):
         super().__init__(charm, "ip-router")
@@ -218,10 +266,18 @@ class RouterRequires(Object):
     def request_network(
         self,
         networks: List[Network],
-    ):
-        """
+    ) -> None:
+        """Requests a new network interface from all of the ip-router providers
+
+        The interfaces must be valid according to `_network_is_valid`. Multiple
+        calls to this function will replace the previously requested networks,
+        so all of the networks required must be given with each call.
+
         Arguments:
-            TODO: write the docstring
+            networks: A list containing the desired networks of the type `Network`.
+
+        Raises:
+            RFC: ValueError, KeyError etc. copy over the _network_is_valid function errors?
         """
         if not self.charm.unit.is_leader():
             return
@@ -229,15 +285,22 @@ class RouterRequires(Object):
         valid_requests = []
         for network_request in networks:
             if self._network_is_valid(network_request):
-                valid_requests.append(network_request)
+                valid_requests.append(
+                    network_request
+                )  # RFC: Should we add valid ones or reject everything if only some are invalid?
 
-        # Place it in the databag
+        # Place it in the databags if they exist
         for relation in self.model.relations.get("ip-router"):
             relation.data[self.charm.app].update({"networks": json.dumps(valid_requests)})
 
-    def get_all_networks(self):
-        """
-        Finds the relation databag with the provider of ip-router and returns the network table found within
+    def get_all_networks(self) -> List[Network]:
+        """Fetches combined routing tables made available by ip-router providers
+
+        Args:
+            None
+        Returns:
+            A list of objects of type `Network`. This list contains networks
+            from all ip-router providers that are integrated with the charm.
         """
         if not self.charm.unit.is_leader():
             return
@@ -250,8 +313,26 @@ class RouterRequires(Object):
                 all_networks.extend(json.loads(networks))
         return all_networks
 
-    def _network_is_valid(self, network_request: Network):
-        """This function validates the"""
+    def _network_is_valid(self, network_request: Network) -> bool:
+        """Validates the network configuration created by the ip-router requirer
+
+        The requested network must have all of the required fields, the gateway
+        has to be located within the network, and all of the routes need to have
+        a path through the top level network. The requested network must also be
+        unassigned by the provider.
+
+        Args:
+            network_request: An object of type `Network`.
+
+        Returns:
+            True if network is valid, False if not.
+
+        Raises:
+            ValueError: Value wrong
+            KeyError: Missing key somewhere
+            RFC: Decide on if we should raise something here.
+            It honestly makes sense because we don't want to have an invalid state ever
+        """
         if "gateway" not in network_request:
             logger.error("Key 'gateway' not found. Skipping entry.")
             return False

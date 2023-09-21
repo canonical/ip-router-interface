@@ -28,8 +28,6 @@ VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
 class SimpleIPRouteProviderCharm(ops.CharmBase):
     """Charm the service."""
 
-    example = "Hey"
-
     def __init__(self, *args):
         super().__init__(*args)
         self.RouterProvider = RouterProvides(charm=self)

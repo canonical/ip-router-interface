@@ -8,4 +8,4 @@ __pycache__/
 .idea
 .vscode/
 
-tests/integration/v0/*/lib
+tests/*/lib
