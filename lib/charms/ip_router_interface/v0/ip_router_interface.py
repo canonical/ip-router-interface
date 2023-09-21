@@ -101,11 +101,10 @@ LIBPATCH = 1
 from ipaddress import IPv4Address, IPv4Network
 from copy import deepcopy
 from typing import Dict, List, Union
-from ops.framework import EventBase, Object, EventSource, ObjectEvents
+from ops.framework import Object
 from ops.charm import CharmBase
 from ops import RelationJoinedEvent, RelationChangedEvent, RelationDepartedEvent, StoredState
 import logging, json
-
 
 logger = logging.getLogger(__name__)
 
@@ -132,36 +131,6 @@ RoutingTable = Dict[
 ]
 
 
-class RoutingTableUpdatedEvent(EventBase):
-    """
-    Charm event for when the network routing table changes.
-    """
-
-
-class NewNetworkRequestEvent(EventBase):
-    """
-    Charm event for when a host registers a route to an existing interface in the router
-    """
-
-
-class NewRouteRequestEvent(EventBase):
-    """
-    Charm event for when a host registers a route to an existing interface in the router
-    """
-
-
-class RouterProviderCharmEvents(ObjectEvents):
-    new_network_request = EventSource(NewNetworkRequestEvent)
-    new_route_request = EventSource(NewRouteRequestEvent)
-    routing_table_updated = EventSource(RoutingTableUpdatedEvent)
-
-
-class RouterRequirerCharmEvents(ObjectEvents):
-    new_network_request = EventSource(NewNetworkRequestEvent)
-    new_route_request = EventSource(NewRouteRequestEvent)
-    routing_table_updated = EventSource(RoutingTableUpdatedEvent)
-
-
 class RouterProvides(Object):
     """This class is used to manage the routing table of the router provider.
 
@@ -172,12 +141,13 @@ class RouterProvides(Object):
     provider charm
 
     Attributes:
-        charm: The Charm object that instantiates this class
-        _stored: The persistent state that keeps the internal routing table.
+        charm:
+            The Charm object that instantiates this class
+        _stored:
+            The persistent state that keeps the internal routing table.
     """
 
     _stored = StoredState()
-    on = RouterProviderCharmEvents()
 
     def __init__(self, charm: CharmBase):
         super().__init__(charm, "ip-router")
@@ -257,8 +227,6 @@ class RouterRequires(Object):
         charm: The Charm object that instantiates this class.
     """
 
-    on = RouterRequirerCharmEvents()  # RFC: Is this actually needed?
-
     def __init__(self, charm: CharmBase):
         super().__init__(charm, "ip-router")
         self.charm = charm
@@ -274,24 +242,30 @@ class RouterRequires(Object):
         so all of the networks required must be given with each call.
 
         Arguments:
-            networks: A list containing the desired networks of the type `Network`.
+            networks:
+                A list containing the desired networks of the type `Network`.
 
         Raises:
-            RFC: ValueError, KeyError etc. copy over the _network_is_valid function errors?
+            RuntimeError:
+                No ip-router relation exists yet or validation of one
+            or more of the networks failed.
         """
         if not self.charm.unit.is_leader():
             return
 
-        valid_requests = []
-        for network_request in networks:
-            if self._network_is_valid(network_request):
-                valid_requests.append(
-                    network_request
-                )  # RFC: Should we add valid ones or reject everything if only some are invalid?
+        ip_router_relations = self.model.relations.get("ip-router")
+        if len(ip_router_relations) == 0:
+            raise RuntimeError("No ip-router relation exists yet.")
 
-        # Place it in the databags if they exist
-        for relation in self.model.relations.get("ip-router"):
-            relation.data[self.charm.app].update({"networks": json.dumps(valid_requests)})
+        for network_request in networks:
+            try:
+                self._validate_network(network_request, networks)
+            except (KeyError, ValueError) as e:
+                raise RuntimeError(f"{network_request} failed to validate.", str(e))
+
+        # Place it in the databags
+        for relation in ip_router_relations:
+            relation.data[self.charm.app].update({"networks": json.dumps(networks)})
 
     def get_all_networks(self) -> List[Network]:
         """Fetches combined routing tables made available by ip-router providers
@@ -306,14 +280,13 @@ class RouterRequires(Object):
             return
 
         router_relations = self.model.relations.get("ip-router")
-
         all_networks = []
         for relation in router_relations:
             if networks := relation.data[relation.app].get("networks"):
                 all_networks.extend(json.loads(networks))
         return all_networks
 
-    def _network_is_valid(self, network_request: Network) -> bool:
+    def _validate_network(self, network_request: Network, new_networks: List[Network]) -> bool:
         """Validates the network configuration created by the ip-router requirer
 
         The requested network must have all of the required fields, the gateway
@@ -322,44 +295,52 @@ class RouterRequires(Object):
         unassigned by the provider.
 
         Args:
-            network_request: An object of type `Network`.
-
-        Returns:
-            True if network is valid, False if not.
+            network_request:
+                An object of type `Network` that will be validated.
+            new_networks:
+                The rest of the networks to check if this one is mutually
+                exclusive to the rest of the subnets.
 
         Raises:
-            ValueError: Value wrong
-            KeyError: Missing key somewhere
-            RFC: Decide on if we should raise something here.
-            It honestly makes sense because we don't want to have an invalid state ever
+            ValueError:
+                Reasons could be that the gateway is not within the network,
+                there is no route to the destination, the network is already
+                taken or the same network is requested twice.
+            KeyError:
+                Missing required key
         """
         if "gateway" not in network_request:
-            logger.error("Key 'gateway' not found. Skipping entry.")
-            return False
+            raise KeyError("Key 'gateway' not found.")
 
         if "network" not in network_request:
-            logger.error("Key 'network' not found. Skipping entry.")
-            return False
+            raise KeyError("Key 'network' not found.")
 
         gateway = IPv4Address(network_request.get("gateway"))
         network = IPv4Network(network_request.get("network"))
 
         if gateway not in network:
-            logger.error("Chosen gateway not within given network. Skipping entry.")
-            return False
+            ValueError("Chosen gateway not within given network.")
 
         for route in network_request.get("routes", []):
             if "gateway" not in route:
-                logger.error("Key 'gateway' not found in route. Skipping entry")
-                return False
+                raise KeyError("Key 'gateway' not found in route.")
 
             if "destination" not in route:
-                logger.error("Key 'destination' not found in route. Skipping entry")
-                return False
+                raise KeyError("Key 'destination' not found in route.")
             route_gateway = IPv4Address(route["gateway"])
             if route_gateway not in network:
-                logger.error("There is no route to this destination from the network.")
-                return False
+                raise ValueError("There is no route to this destination from the network.")
+
+        for entry in new_networks:
+            if entry == network_request:
+                continue
+            existing_network = IPv4Network(entry["network"])
+            new_network = IPv4Network(network_request["network"])
+
+            if new_network.subnet_of(existing_network) or new_network.supernet_of(
+                existing_network
+            ):
+                raise ValueError("This network has been defined in another entry.")
 
         rt = self.get_all_networks()
         for entry in rt:
@@ -369,7 +350,4 @@ class RouterRequires(Object):
             if new_network.subnet_of(existing_network) or new_network.supernet_of(
                 existing_network
             ):
-                logger.error("This network is already taken.")
-                return False
-
-        return True
+                raise ValueError("This network is already taken by another requirer.")

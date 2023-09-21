@@ -35,7 +35,6 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
 
         self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
         self.framework.observe(self.on.request_network_action, self._action_request_network)
-        self.framework.observe(self.on.request_route_action, self._action_request_route)
 
     def _on_install(self, event: ops.InstallEvent):
         self.unit.status = ops.BlockedStatus("Waiting for relation to be created")
@@ -48,21 +47,8 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         event.set_results({"msg": json.dumps(rt)})
 
     def _action_request_network(self, event: ops.ActionEvent):
-        self.RouterRequirer.request_network(IPv4Interface(event.params["network"]))
+        self.RouterRequirer.request_network(json.loads(event.params["network"]))
         event.set_results({"msg": "ok"})
-
-    def _action_request_route(self, event: ops.ActionEvent):
-        network = IPv4Address(event.params["network"])
-        destination = IPv4Network(event.params["destination"])
-        gateway = IPv4Address(event.params["gateway"])
-
-        self.RouterRequirer.request_route(
-            existing_network=IPv4Address(network),
-            destination=IPv4Network(destination),
-            gateway=IPv4Address(gateway),
-        )
-
-        event.set_results({"message": "ok"})
 
 
 if __name__ == "__main__":  # pragma: nocover

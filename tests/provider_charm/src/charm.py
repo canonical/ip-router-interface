@@ -42,7 +42,7 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus("Ready to Provide")
 
     def _action_get_routing_table(self, event: ops.ActionEvent):
-        rt = self.RouterProvider.get_routing_table()
+        rt = self.RouterProvider.get_flattened_routing_table()
         event.set_results({"msg": json.dumps(rt)})
 
 

@@ -7,16 +7,3 @@ request-network:
     network:
       type: string
       description: the requested network
-
-request-route:
- description: request a new route in an existing network
- params:
-  network:
-    type: string
-    description: existing network the route will be a part of
-  destination:
-    type: string
-    description: the destination of the route
-  gateway:
-    type: string
-    description: the gateway to the destination
