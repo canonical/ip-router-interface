@@ -286,7 +286,7 @@ class RouterRequires(Object):
         self,
         networks: List[Network],
     ) -> None:
-        """Requests a new network interface from all of the ip-router providers
+        """Requests a new network interface from the ip-router provider
 
         The interfaces must be valid according to `_network_is_valid`. Multiple
         calls to this function will replace the previously requested networks,
