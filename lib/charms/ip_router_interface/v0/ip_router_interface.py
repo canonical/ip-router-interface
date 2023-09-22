@@ -27,7 +27,7 @@ The library handles the listening and synchronization for all of the ip-router n
 requests internally, which means as the charm author you don't need to worry about any
 of the business logic of validating or orchestrating the relation network.
 
-You can also listen to the `routing_table_updated` event.
+You can also listen to the `routing_table_updated` event for convenience.
 
 
 ```python
@@ -41,16 +41,22 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         super().__init__(*args)
         self.RouterProvider = RouterProvides(charm=self)
         self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.routing_table_updated, self._routing_table_updated)
         self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
 
     def _on_install(self, event: ops.InstallEvent):
         pass
 
-    def _action_get_routing_table(self, event: ops.ActionEvent):
-        # Process the networks however you like
+    def _routing_table_updated(self, event):
         routing_table = self.RouterProvider.get_routing_table()
         all_networks = self.RouterProvider.get_flattened_routing_table()
 
+        # Process the networks however you like
+        implement_networks(all_networks)
+        
+        
+    def _action_get_routing_table(self, event: ops.ActionEvent):
+        all_networks = self.RouterProvider.get_flattened_routing_table()
         event.set_results({"msg": json.dumps(all_networks)})
     
 
