@@ -249,15 +249,15 @@ class RouterProvides(Object):
         Returns:
             A list of objects of type `Network`
         """
-        internal_rt = self.get_routing_table()
-        final_rt = []
-        for networks in internal_rt.values():
+        internal_routing_table = self.get_routing_table()
+        final_routing_table = []
+        for networks in internal_routing_table.values():
             if type(networks) is not str:
                 continue
             for network in json.loads(networks):
-                final_rt.append(network)
+                final_routing_table.append(network)
 
-        return final_rt
+        return final_routing_table
 
     def _sync_routing_tables(self) -> None:
         """Syncs the internal routing table with all of the requirer's app databags"""
@@ -395,8 +395,8 @@ class RouterRequires(Object):
             ):
                 raise ValueError("This network has been defined in another entry.")
 
-        rt = self.get_all_networks()
-        for entry in rt:
+        routing_table = self.get_all_networks()
+        for entry in routing_table:
             existing_network = IPv4Network(entry["network"])
             new_network = IPv4Network(network_request["network"])
 
