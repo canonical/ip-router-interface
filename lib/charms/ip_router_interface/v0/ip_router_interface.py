@@ -194,9 +194,10 @@ class RouterProvides(Object):
     on = RouterProviderCharmEvents()
     _stored = StoredState()
 
-    def __init__(self, charm: CharmBase):
-        super().__init__(charm, "ip-router")
+    def __init__(self, charm: CharmBase, relationship_name: str = "ip-router"):
+        super().__init__(charm, relationship_name)
         self.charm = charm
+        self.relationship_name = relationship_name
         self._stored.set_default(routing_table={})
         self.framework.observe(
             charm.on.ip_router_relation_changed, self._on_ip_router_relation_changed
@@ -278,9 +279,10 @@ class RouterRequires(Object):
         charm: The Charm object that instantiates this class.
     """
 
-    def __init__(self, charm: CharmBase):
-        super().__init__(charm, "ip-router")
+    def __init__(self, charm: CharmBase, relationship_name: str = "ip-router"):
+        super().__init__(charm, relationship_name)
         self.charm = charm
+        self.relationship_name = relationship_name
 
     def request_network(
         self,
@@ -304,7 +306,7 @@ class RouterRequires(Object):
         if not self.charm.unit.is_leader():
             return
 
-        ip_router_relations = self.model.relations.get("ip-router")
+        ip_router_relations = self.model.relations.get(self.relationship_name)
         if len(ip_router_relations) == 0:
             raise RuntimeError("No ip-router relation exists yet.")
 
