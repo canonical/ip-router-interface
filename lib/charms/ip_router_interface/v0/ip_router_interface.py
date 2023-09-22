@@ -15,7 +15,20 @@ charmcraft fetch-lib charms.ip_router_interface.v0.ip_router_interface
 ```
 
 ### Provider charm
-This example provider charm is all we need to listen to ip-router requirer requests:
+This example provider charm is all we need to listen to ip-router requirer requests.
+The ip-router provider fulfills the routing function for multiple charms that are
+requirers of the ip-router interface. For that reason, this charm will continuously
+track and update all of the connected requirers and the networks and routes they've 
+requested, which it does in a routing table. As new charms are connected and disconnected
+to the relation, this routing table is automatically adds and removes the dependent
+networks.
+
+The library handles the listening and synchronization for all of the ip-router network
+requests internally, which means as the charm author you don't need to worry about any
+of the business logic of validating or orchestrating the relation network.
+
+You can also listen to the `routing_table_updated` event.
+
 
 ```python
 import logging, json
@@ -28,13 +41,18 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         super().__init__(*args)
         self.RouterProvider = RouterProvides(charm=self)
         self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.ip_router_relation_joined, self._on_relation_joined)
+        self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
 
     def _on_install(self, event: ops.InstallEvent):
         pass
 
-    def _on_relation_joined(self, event: ops.RelationJoinedEvent):
-        self.unit.status = ops.ActiveStatus("Ready to Provide")
+    def _action_get_routing_table(self, event: ops.ActionEvent):
+        # Process the networks however you like
+        routing_table = self.RouterProvider.get_routing_table()
+        all_networks = self.RouterProvider.get_flattened_routing_table()
+
+        event.set_results({"msg": json.dumps(all_networks)})
+    
 
 
 if __name__ == "__main__":  # pragma: nocover
@@ -42,8 +60,15 @@ if __name__ == "__main__":  # pragma: nocover
 ```
 
 ### Requirer charm
-This example requirer charm shows a flow where the user can run actions to request
-new networks and get the available networks:
+This example requirer charm shows the two available actions as a host in the network:
+* get the latest list of all networks available from the provider
+* request a network to be assigned to the requirer charm
+
+The ip-router requirer allows a foolproof, typechecked, secure and safe way to 
+interact with the router that handles validation and format of the network 
+request, so you can focus on more important things. The library also provides a
+way to list out all of the available networks. This list is not cached, and comes
+directly from the provider.
 
 ```python
 import logging, json
@@ -59,7 +84,7 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.ip_router_relation_joined, self._on_relation_joined)
 
-        self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
+        self.framework.observe(self.on.get_all_networks_action, self._action_get_all_networks)
         self.framework.observe(self.on.request_network_action, self._action_request_network)
 
     def _on_install(self, event: ops.InstallEvent):
@@ -68,12 +93,15 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
     def _on_relation_joined(self, event: ops.RelationJoinedEvent):
         self.unit.status = ops.ActiveStatus("Ready to Require")
 
-    def _action_get_routing_table(self, event: ops.ActionEvent):
-        rt = self.RouterRequirer.get_routing_table()
-        event.set_results({"msg": json.dumps(rt)})
+    def _action_get_all_networks(self, event: ops.ActionEvent):
+        # Get and process all of the available networks
+        all_networks = self.RouterRequirer.get_all_networks()
+        event.set_results({"msg": json.dumps(all_networks)})
 
     def _action_request_network(self, event: ops.ActionEvent):
+        # Request a new network as required in the required format
         self.RouterRequirer.request_network(event.params["network"])
+
         event.set_results({"msg": "ok"})
 
 
