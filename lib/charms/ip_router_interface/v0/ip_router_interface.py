@@ -100,7 +100,7 @@ LIBPATCH = 1
 
 from ipaddress import IPv4Address, IPv4Network
 from copy import deepcopy
-from typing import Dict, List, Union
+from typing import Dict, List, Union, TypeAlias
 from ops.framework import Object, EventSource, EventBase, ObjectEvents
 from ops.charm import CharmBase
 from ops import RelationJoinedEvent, RelationChangedEvent, RelationDepartedEvent, StoredState
@@ -108,7 +108,7 @@ import logging, json
 
 logger = logging.getLogger(__name__)
 
-Network = Dict[
+Network: TypeAlias = Dict[
     str,  # 'network' | 'gateway' | 'routes'
     Union[
         IPv4Address,  # gateway, ex: '192.168.250.1'
@@ -125,7 +125,7 @@ Network = Dict[
     ],
 ]
 
-RoutingTable = Dict[
+RoutingTable: TypeAlias = Dict[
     str,  # Name of the application
     List[Network],  # All networks for this application
 ]
@@ -282,10 +282,7 @@ class RouterRequires(Object):
 
         # Place it in the databags
         for relation in ip_router_relations:
-            logger.warning(relation.data)
-            logger.warning(relation.data[self.charm.app])
             relation.data[self.charm.app].update({"networks": json.dumps(networks)})
-            logger.warning(relation.data[self.charm.app])
 
     def get_all_networks(self) -> List[Network]:
         """Fetches combined routing tables made available by ip-router providers
