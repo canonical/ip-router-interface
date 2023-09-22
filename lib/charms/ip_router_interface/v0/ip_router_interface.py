@@ -311,10 +311,7 @@ class RouterRequires(Object):
             raise RuntimeError("No ip-router relation exists yet.")
 
         for network_request in networks:
-            try:
-                self._validate_network(network_request, networks)
-            except (KeyError, ValueError) as e:
-                raise RuntimeError(f"{network_request} failed to validate.", str(e))
+            self._validate_network(network_request, networks)
 
         # Place it in the databags
         for relation in ip_router_relations:

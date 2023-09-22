@@ -390,8 +390,8 @@ class TestRequirer(unittest.TestCase):
         ]
         try:
             harness.charm.RouterRequirer.request_network(network_request)
-        except RuntimeError as e:
-            assert e.args[1] == "This network is already taken by another requirer."
+        except ValueError as e:
+            assert e.args[0] == "This network is already taken by another requirer."
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
@@ -418,8 +418,8 @@ class TestRequirer(unittest.TestCase):
         ]
         try:
             harness.charm.RouterRequirer.request_network(network_request)
-        except RuntimeError as e:
-            assert e.args[1] == "There is no route to this destination from the network."
+        except ValueError as e:
+            assert e.args[0] == "There is no route to this destination from the network."
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
     def test_request_new_network_multiple_with_one_invalid(self):
@@ -449,8 +449,8 @@ class TestRequirer(unittest.TestCase):
         ]
         try:
             harness.charm.RouterRequirer.request_network(network_request)
-        except RuntimeError as e:
-            assert e.args[1] == "There is no route to this destination from the network."
+        except ValueError as e:
+            assert e.args[0] == "There is no route to this destination from the network."
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
     def test_request_new_network_no_gateway(self):
@@ -466,8 +466,8 @@ class TestRequirer(unittest.TestCase):
         ]
         try:
             harness.charm.RouterRequirer.request_network(network_request)
-        except RuntimeError as e:
-            assert e.args[1] == "\"Key 'gateway' not found.\""
+        except KeyError as e:
+            assert e.args[0] == "Key 'gateway' not found."
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
@@ -484,8 +484,8 @@ class TestRequirer(unittest.TestCase):
         ]
         try:
             harness.charm.RouterRequirer.request_network(network_request)
-        except RuntimeError as e:
-            assert e.args[1] == "\"Key 'network' not found.\""
+        except KeyError as e:
+            assert e.args[0] == "Key 'network' not found."
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
@@ -506,8 +506,8 @@ class TestRequirer(unittest.TestCase):
         ]
         try:
             harness.charm.RouterRequirer.request_network(network_request)
-        except RuntimeError as e:
-            assert e.args[1] == "\"Key 'destination' not found in route.\""
+        except KeyError as e:
+            assert e.args[0] == "Key 'destination' not found in route."
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
@@ -528,6 +528,6 @@ class TestRequirer(unittest.TestCase):
         ]
         try:
             harness.charm.RouterRequirer.request_network(network_request)
-        except RuntimeError as e:
-            assert e.args[1] == "\"Key 'gateway' not found in route.\""
+        except KeyError as e:
+            assert e.args[0] == "Key 'gateway' not found in route."
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
