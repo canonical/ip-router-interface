@@ -1,4 +1,4 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Library for the ip-router integration
@@ -11,7 +11,7 @@ ip-router interface
 From a charm directory, fetch the library using `charmcraft`:
 
 ```shell
-charmcraft fetch-lib charms.ip_router_interface.v0.ip_router_interface TODO: Verify this works
+charmcraft fetch-lib charms.ip_router_interface.v0.ip_router_interface
 ```
 
 ### Provider charm
