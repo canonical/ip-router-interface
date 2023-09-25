@@ -45,7 +45,7 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
 
     def _on_install(self, event: ops.InstallEvent):
-        pass
+        self.unit.status = ops.ActiveStatus("Ready to Provide")
 
     def _routing_table_updated(self, event: RoutingTableUpdatedEvent):
         routing_table = self.RouterProvider.get_routing_table()
@@ -94,7 +94,7 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         self.framework.observe(self.on.request_network_action, self._action_request_network)
 
     def _on_install(self, event: ops.InstallEvent):
-        pass
+        self.unit.status = ops.ActiveStatus("Ready to Provide")
 
     def _on_relation_joined(self, event: ops.RelationJoinedEvent):
         self.unit.status = ops.ActiveStatus("Ready to Require")
