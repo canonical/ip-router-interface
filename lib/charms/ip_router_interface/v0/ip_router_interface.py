@@ -47,7 +47,7 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
     def _on_install(self, event: ops.InstallEvent):
         pass
 
-    def _routing_table_updated(self, event):
+    def _routing_table_updated(self, event: RoutingTableUpdatedEvent):
         routing_table = self.RouterProvider.get_routing_table()
         all_networks = self.RouterProvider.get_flattened_routing_table()
 
