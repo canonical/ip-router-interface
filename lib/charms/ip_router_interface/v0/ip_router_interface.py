@@ -252,7 +252,7 @@ class RouterProvides(Object):
         internal_routing_table = self.get_routing_table()
         final_routing_table = []
         for networks in internal_routing_table.values():
-            if type(networks) is not str:
+            if isinstance(networks, str):
                 continue
             for network in json.loads(networks):
                 final_routing_table.append(network)
