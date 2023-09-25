@@ -3,5 +3,5 @@ description: ip-router-requirer.
 summary: ip-router-requirer.
 
 requires:
-  ip-router:
-    interface: simple-router-test
+  example-host:
+    interface: ip-router

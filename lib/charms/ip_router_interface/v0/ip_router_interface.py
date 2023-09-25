@@ -200,21 +200,21 @@ class RouterProvides(Object):
         self.relationship_name = relationship_name
         self._stored.set_default(routing_table={})
         self.framework.observe(
-            charm.on.ip_router_relation_changed, self._on_ip_router_relation_changed
+            charm.on[relationship_name].relation_changed, self._router_relation_changed
         )
         self.framework.observe(
-            charm.on.ip_router_relation_joined, self._on_ip_router_relation_joined
+            charm.on[relationship_name].relation_joined, self._router_relation_joined
         )
         self.framework.observe(
-            charm.on.ip_router_relation_departed, self._on_ip_router_relation_departed
+            charm.on[relationship_name].relation_departed, self._router_relation_departed
         )
 
-    def _on_ip_router_relation_joined(self, event: RelationJoinedEvent):
+    def _router_relation_joined(self, event: RelationJoinedEvent):
         """When a new unit or app joins the relation, add its name to the routing table"""
         self._stored.routing_table.update({event.relation.app.name: []})
         self._sync_routing_tables()
 
-    def _on_ip_router_relation_changed(self, event: RelationChangedEvent):
+    def _router_relation_changed(self, event: RelationChangedEvent):
         """Update the internal routing table state to reflect changes in
         requirer units' new network requests.
         """
@@ -231,7 +231,7 @@ class RouterProvides(Object):
         self._sync_routing_tables()
         self.on.routing_table_updated.emit()
 
-    def _on_ip_router_relation_departed(self, event: RelationDepartedEvent):
+    def _router_relation_departed(self, event: RelationDepartedEvent):
         """If an application has completely departed the relation, remove it
         from the routing table.
         """
@@ -251,17 +251,18 @@ class RouterProvides(Object):
         """
         internal_routing_table = self.get_routing_table()
         final_routing_table = []
-        for networks in internal_routing_table.values():
+        for relation_name, networks in internal_routing_table.values():
+            # try validating, continue if not
             if not isinstance(networks, str):
                 continue
             for network in json.loads(networks):
-                final_routing_table.append(network)
+                final_routing_table.append({relation_name: network})
 
         return final_routing_table
 
     def _sync_routing_tables(self) -> None:
         """Syncs the internal routing table with all of the requirer's app databags"""
-        ip_router_relations = self.model.relations["ip-router"]
+        ip_router_relations = self.model.relations[self.relationship_name]
         for relation in ip_router_relations:
             relation.data[self.charm.app].update(
                 {"networks": json.dumps(self.get_flattened_routing_table())}
@@ -315,7 +316,9 @@ class RouterRequires(Object):
 
         # Place it in the databags
         for relation in ip_router_relations:
-            relation.data[self.charm.app].update({"networks": json.dumps(networks)})
+            relation.data[self.charm.app].update(
+                {"networks": {self.relationship_name: json.dumps(networks)}}
+            )
 
     def get_all_networks(self) -> List[Network]:
         """Fetches combined routing tables made available by ip-router providers
@@ -329,7 +332,7 @@ class RouterRequires(Object):
         if not self.charm.unit.is_leader():
             return
 
-        router_relations = self.model.relations.get("ip-router")
+        router_relations = self.model.relations.get(self.relationship_name)
         all_networks = []
         for relation in router_relations:
             if networks := relation.data[relation.app].get("networks"):

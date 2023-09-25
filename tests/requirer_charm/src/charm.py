@@ -22,15 +22,21 @@ logger = logging.getLogger(__name__)
 
 VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
 
+IP_ROUTER_REQUIRER_RELATION_NAME = "example-host"
+
 
 class SimpleIPRouteRequirerCharm(ops.CharmBase):
     """Charm the service."""
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.RouterRequirer = RouterRequires(charm=self)  # noqa
+        self.RouterRequirer = RouterRequires(
+            charm=self, relationship_name=IP_ROUTER_REQUIRER_RELATION_NAME
+        )  # noqa
         self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.ip_router_relation_joined, self._on_relation_joined)
+        self.framework.observe(
+            self.on[IP_ROUTER_REQUIRER_RELATION_NAME].relation_joined, self._on_relation_joined
+        )
 
         self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
         self.framework.observe(self.on.request_network_action, self._action_request_network)

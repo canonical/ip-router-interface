@@ -3,5 +3,5 @@ description: ip-router-provider.
 summary: ip-router-provider.
 
 provides:
-  ip-router:
-    interface: simple-router-test
+  example-router:
+    interface: ip-router

@@ -11,8 +11,14 @@ from itertools import chain
 
 from ops.testing import Harness
 
-from tests.provider_charm.src.charm import SimpleIPRouteProviderCharm
-from tests.requirer_charm.src.charm import SimpleIPRouteRequirerCharm
+from tests.provider_charm.src.charm import (
+    SimpleIPRouteProviderCharm,
+    IP_ROUTER_PROVIDER_RELATION_NAME,
+)
+from tests.requirer_charm.src.charm import (
+    SimpleIPRouteRequirerCharm,
+    IP_ROUTER_REQUIRER_RELATION_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +57,9 @@ class TestProvider(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-requirer")
+        rel_id = harness.add_relation(IP_ROUTER_PROVIDER_RELATION_NAME, "ip-router-requirer")
         harness.add_relation_unit(rel_id, "ip-router-requirer/0")
+        # Create a new relation with a different name
 
         # Get routing table
         expected_rt = {"ip-router-requirer": []}
@@ -62,7 +69,7 @@ class TestProvider(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-requirer")
+        rel_id = harness.add_relation(IP_ROUTER_PROVIDER_RELATION_NAME, "ip-router-requirer")
         harness.add_relation_unit(rel_id, "ip-router-requirer/0")
 
         # Update databag
@@ -81,7 +88,7 @@ class TestProvider(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-requirer")
+        rel_id = harness.add_relation(IP_ROUTER_PROVIDER_RELATION_NAME, "ip-router-requirer")
         harness.add_relation_unit(rel_id, "ip-router-requirer/0")
 
         # Update databag with a network with route
@@ -106,7 +113,7 @@ class TestProvider(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-requirer")
+        rel_id = harness.add_relation(IP_ROUTER_PROVIDER_RELATION_NAME, "ip-router-requirer")
         harness.add_relation_unit(rel_id, "ip-router-requirer/0")
 
         # Update databag
@@ -128,15 +135,15 @@ class TestProvider(unittest.TestCase):
         harness = self._setup()
 
         # Create relation 1
-        rel_a_id = harness.add_relation("ip-router", "ip-router-requirer-a")
+        rel_a_id = harness.add_relation(IP_ROUTER_PROVIDER_RELATION_NAME, "ip-router-requirer-a")
         harness.add_relation_unit(rel_a_id, "ip-router-requirer-a/0")
 
         # Create relation 2
-        rel_b_id = harness.add_relation("ip-router", "ip-router-requirer-b")
+        rel_b_id = harness.add_relation(IP_ROUTER_PROVIDER_RELATION_NAME, "ip-router-requirer-b")
         harness.add_relation_unit(rel_b_id, "ip-router-requirer-b/0")
 
         # Create relation 3
-        rel_c_id = harness.add_relation("ip-router", "ip-router-requirer-c")
+        rel_c_id = harness.add_relation(IP_ROUTER_PROVIDER_RELATION_NAME, "ip-router-requirer-c")
         harness.add_relation_unit(rel_c_id, "ip-router-requirer-c/0")
 
         # Update databag 1 with a network with route
@@ -196,11 +203,11 @@ class TestProvider(unittest.TestCase):
         harness = self._setup()
 
         # Create relation 1
-        rel_a_id = harness.add_relation("ip-router", "ip-router-requirer-a")
+        rel_a_id = harness.add_relation(IP_ROUTER_PROVIDER_RELATION_NAME, "ip-router-requirer-a")
         harness.add_relation_unit(rel_a_id, "ip-router-requirer-a/0")
 
         # Create relation 2
-        rel_b_id = harness.add_relation("ip-router", "ip-router-requirer-b")
+        rel_b_id = harness.add_relation(IP_ROUTER_PROVIDER_RELATION_NAME, "ip-router-requirer-b")
         harness.add_relation_unit(rel_b_id, "ip-router-requirer-b/0")
 
         # Update databag 1 with a network with route
@@ -254,16 +261,17 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         assert harness.charm.RouterRequirer.get_all_networks() == []
 
     def test_get_routing_table_multiple_networks(self):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Create existing network
@@ -281,17 +289,18 @@ class TestRequirer(unittest.TestCase):
             rel_id, "ip-router-provider", {"networks": json.dumps(existing_network)}
         )
 
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         assert harness.charm.RouterRequirer.get_all_networks() == existing_network
 
     def test_get_routing_table_multiple_networks_and_providers(self):
         harness = self._setup()
 
         # Create relation 1
-        rel_1_id = harness.add_relation("ip-router", "ip-router-provider-a")
+        rel_1_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider-a")
         harness.add_relation_unit(rel_1_id, "ip-router-provider-a/0")
 
         # Create relation 2
-        rel_2_id = harness.add_relation("ip-router", "ip-router-provider-b")
+        rel_2_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider-b")
         harness.add_relation_unit(rel_2_id, "ip-router-provider-b/0")
 
         # Create network 1
@@ -313,6 +322,7 @@ class TestRequirer(unittest.TestCase):
         harness.update_relation_data(
             rel_2_id, "ip-router-provider-b", {"networks": json.dumps(existing_network_2)}
         )
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         assert (
             harness.charm.RouterRequirer.get_all_networks()
             == existing_network_1 + existing_network_2
@@ -322,7 +332,7 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Request a network
@@ -332,6 +342,7 @@ class TestRequirer(unittest.TestCase):
                 "gateway": "192.168.252.1",
             }
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         harness.charm.RouterRequirer.request_network(network_request)
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {
@@ -342,7 +353,7 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Request a network
@@ -350,6 +361,7 @@ class TestRequirer(unittest.TestCase):
             {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
             {"network": "192.168.250.0/24", "gateway": "192.168.250.1"},
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         harness.charm.RouterRequirer.request_network(network_request)
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {
@@ -366,6 +378,7 @@ class TestRequirer(unittest.TestCase):
                 "gateway": "192.168.252.1",
             }
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         try:
             harness.charm.RouterRequirer.request_network(network_request)
         except RuntimeError as e:
@@ -375,7 +388,7 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Create existing network
@@ -388,6 +401,7 @@ class TestRequirer(unittest.TestCase):
         network_request = [
             {"network": "192.168.240.0/20", "gateway": "192.168.250.1"},
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         try:
             harness.charm.RouterRequirer.request_network(network_request)
         except ValueError as e:
@@ -399,7 +413,7 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Create existing network
@@ -416,6 +430,7 @@ class TestRequirer(unittest.TestCase):
                 "routes": [{"destination": "172.250.0.0/16", "gateway": "192.168.240.3"}],
             }
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         try:
             harness.charm.RouterRequirer.request_network(network_request)
         except ValueError as e:
@@ -426,7 +441,7 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Create existing network
@@ -447,6 +462,7 @@ class TestRequirer(unittest.TestCase):
                 "gateway": "192.168.251.1",
             },
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         try:
             harness.charm.RouterRequirer.request_network(network_request)
         except ValueError as e:
@@ -457,13 +473,14 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Request a network
         network_request = [
             {"network": "192.168.240.0/20", "sad": "192.168.250.1"},
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         try:
             harness.charm.RouterRequirer.request_network(network_request)
         except KeyError as e:
@@ -475,13 +492,14 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Request a network
         network_request = [
             {"sad": "192.168.240.0/20", "gateway": "192.168.250.1"},
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         try:
             harness.charm.RouterRequirer.request_network(network_request)
         except KeyError as e:
@@ -493,7 +511,7 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Request a network
@@ -504,6 +522,7 @@ class TestRequirer(unittest.TestCase):
                 "routes": [{"destinope": "172.250.0.0/16", "gateway": "192.168.240.3"}],
             }
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         try:
             harness.charm.RouterRequirer.request_network(network_request)
         except KeyError as e:
@@ -515,7 +534,7 @@ class TestRequirer(unittest.TestCase):
         harness = self._setup()
 
         # Create a relation
-        rel_id = harness.add_relation("ip-router", "ip-router-provider")
+        rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         # Request a network
@@ -526,6 +545,7 @@ class TestRequirer(unittest.TestCase):
                 "routes": [{"destination": "172.250.0.0/16", "gateroad": "192.168.240.3"}],
             }
         ]
+        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         try:
             harness.charm.RouterRequirer.request_network(network_request)
         except KeyError as e:
