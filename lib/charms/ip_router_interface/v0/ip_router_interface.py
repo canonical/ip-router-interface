@@ -314,7 +314,7 @@ class RouterProvides(Object):
                     _validate_network(network, final_routing_table)
                 except (ValueError, KeyError) as e:
                     logger.error(
-                        f"Exception ({e.args[0]}) occured with network {network}. Skipping this entry."
+                        f"Exception ({e.args[0]}) occurred with network {network}. Skipping this entry."
                     )
                 else:
                     final_routing_table[new_network_name].append(network)

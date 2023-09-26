@@ -16,7 +16,7 @@ import json
 import logging
 
 import ops
-from charms.ip_router_interface.v0.ip_router_interface import *  # noqa
+from charms.ip_router_interface.v0.ip_router_interface import RouterProvides  # noqa
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -58,5 +58,5 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         event.set_results({"msg": json.dumps(rt)})
 
 
-if __name__ == "__main__":  # pragma: nocover
-    ops.main(SimpleIPRouteProviderCharm)  # type: ignore
+if __name__ == "__main__":
+    ops.main.main(SimpleIPRouteProviderCharm)

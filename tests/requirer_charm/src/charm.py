@@ -16,13 +16,13 @@ import json
 import logging
 
 import ops
-from charms.ip_router_interface.v0.ip_router_interface import *  # noqa
+from charms.ip_router_interface.v0.ip_router_interface import RouterRequires  # noqa
 
 logger = logging.getLogger(__name__)
 
 VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
 
-IP_ROUTER_REQUIRER_RELATION_NAME = "example-host-1"
+IP_ROUTER_REQUIRER_RELATION_NAME = "example-host-a"
 
 
 class SimpleIPRouteRequirerCharm(ops.CharmBase):
@@ -56,5 +56,5 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         event.set_results({"msg": "ok"})
 
 
-if __name__ == "__main__":  # pragma: nocover
-    ops.main.main(SimpleIPRouteRequirerCharm)  # type: ignore
+if __name__ == "__main__":
+    ops.main.main(SimpleIPRouteRequirerCharm)

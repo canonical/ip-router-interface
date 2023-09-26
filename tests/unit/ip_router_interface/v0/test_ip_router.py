@@ -12,12 +12,12 @@ from itertools import chain
 from ops.testing import Harness
 
 from tests.provider_charm.src.charm import (
-    SimpleIPRouteProviderCharm,
     IP_ROUTER_PROVIDER_RELATION_NAME,
+    SimpleIPRouteProviderCharm,
 )
 from tests.requirer_charm.src.charm import (
-    SimpleIPRouteRequirerCharm,
     IP_ROUTER_REQUIRER_RELATION_NAME,
+    SimpleIPRouteRequirerCharm,
 )
 
 logger = logging.getLogger(__name__)
