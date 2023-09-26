@@ -16,7 +16,9 @@ LIB_NAME = "ip_router_interface.py"
 REQUIRER_CHARM_DIR = "tests/requirer_charm"
 PROVIDER_CHARM_DIR = "tests/provider_charm"
 IP_ROUTER_PROVIDER_APP_NAME = "ip-router-provider"
+IP_ROUTER_PROVIDER_RELATION_NAME = "example-router"
 IP_ROUTER_REQUIRER_APP_NAME = "ip-router-requirer"
+IP_ROUTER_REQUIRER_RELATION_NAME = "example-host"
 
 
 def copy_lib_content() -> None:
@@ -62,8 +64,8 @@ class TestIntegration:
     @pytest.mark.abort_on_fail
     async def test_given_charms_deployed_when_relate_then_status_is_active(self, ops_test):
         await ops_test.model.add_relation(
-            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-a",
-            relation2=IP_ROUTER_PROVIDER_APP_NAME,
+            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-a:{IP_ROUTER_REQUIRER_RELATION_NAME}-a",
+            relation2=f"{IP_ROUTER_PROVIDER_APP_NAME}:{IP_ROUTER_PROVIDER_RELATION_NAME}",
         )
 
         await ops_test.model.wait_for_idle(
@@ -79,7 +81,7 @@ class TestIntegration:
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == {f"{IP_ROUTER_REQUIRER_APP_NAME}-a": []}
+        assert json.loads(action_output["msg"]) == {f"{IP_ROUTER_REQUIRER_RELATION_NAME}-a": []}
 
     @pytest.mark.abort_on_fail
     async def test_given_network_request_provider_implements_and_requirer_sees(self, ops_test):
@@ -126,8 +128,8 @@ class TestIntegration:
             timeout=1000,
         )
         await ops_test.model.add_relation(
-            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-b",
-            relation2=IP_ROUTER_PROVIDER_APP_NAME,
+            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-b:{IP_ROUTER_REQUIRER_RELATION_NAME}-b",
+            relation2=f"{IP_ROUTER_PROVIDER_APP_NAME}:{IP_ROUTER_PROVIDER_RELATION_NAME}",
         )
         await ops_test.model.wait_for_idle(
             apps=[

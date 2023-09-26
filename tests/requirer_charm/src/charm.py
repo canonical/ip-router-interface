@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
 
-IP_ROUTER_REQUIRER_RELATION_NAME = "example-host"
+IP_ROUTER_REQUIRER_RELATION_NAME = "example-host-1"
 
 
 class SimpleIPRouteRequirerCharm(ops.CharmBase):
