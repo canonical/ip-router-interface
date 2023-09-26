@@ -392,8 +392,6 @@ class RouterRequires(Object):
     def get_all_networks(self) -> List[Network]:
         """Fetches combined routing tables made available by ip-router providers
 
-        Args:
-            None
         Returns:
             A list of objects of type `Network`. This list contains networks
             from all ip-router providers that are integrated with the charm.

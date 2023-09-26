@@ -32,7 +32,7 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         super().__init__(*args)
         self.RouterRequirer = RouterRequires(
             charm=self, relationship_name=IP_ROUTER_REQUIRER_RELATION_NAME
-        )  # noqa
+        )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
             self.on[IP_ROUTER_REQUIRER_RELATION_NAME].relation_joined, self._on_relation_joined

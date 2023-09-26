@@ -33,7 +33,7 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         super().__init__(*args)
         self.RouterProvider = RouterProvides(
             charm=self, relationship_name=IP_ROUTER_PROVIDER_RELATION_NAME
-        )  # noqa
+        )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
             self.on[IP_ROUTER_PROVIDER_RELATION_NAME].relation_joined, self._on_relation_joined
