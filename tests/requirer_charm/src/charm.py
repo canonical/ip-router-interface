@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
 
-IP_ROUTER_REQUIRER_RELATION_NAME = "example-host-a"
+IP_ROUTER_REQUIRER_RELATION_NAME = "example-host"
 
 
 class SimpleIPRouteRequirerCharm(ops.CharmBase):
@@ -31,11 +31,19 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.RouterRequirer = RouterRequires(
-            charm=self, relationship_name=IP_ROUTER_REQUIRER_RELATION_NAME
+            charm=self, relationship_name=f"{IP_ROUTER_REQUIRER_RELATION_NAME}"
+        )
+        self.RouterRequirer_B = RouterRequires(
+            charm=self, relationship_name=f"{IP_ROUTER_REQUIRER_RELATION_NAME}-b"
         )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
-            self.on[IP_ROUTER_REQUIRER_RELATION_NAME].relation_joined, self._on_relation_joined
+            self.on[IP_ROUTER_REQUIRER_RELATION_NAME].relation_joined,
+            self._on_relation_joined,
+        )
+        self.framework.observe(
+            self.on[f"{IP_ROUTER_REQUIRER_RELATION_NAME}-b"].relation_joined,
+            self._on_relation_joined,
         )
 
         self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
@@ -48,11 +56,17 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus("Ready to Require")
 
     def _action_get_routing_table(self, event: ops.ActionEvent):
-        rt = self.RouterRequirer.get_all_networks()
+        if self.app.name[-1] == "b":
+            rt = self.RouterRequirer_B.get_all_networks()
+        else:
+            rt = self.RouterRequirer.get_all_networks()
         event.set_results({"msg": json.dumps(rt)})
 
     def _action_request_network(self, event: ops.ActionEvent):
-        self.RouterRequirer.request_network(json.loads(event.params["network"]))
+        if self.app.name[-1] == "b":
+            self.RouterRequirer_B.request_network(json.loads(event.params["network"]))
+        else:
+            self.RouterRequirer.request_network(json.loads(event.params["network"]))
         event.set_results({"msg": "ok"})
 
 

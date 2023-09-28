@@ -52,24 +52,24 @@ class TestIntegration:
         )
         await ops_test.model.deploy(
             TestIntegration.requirer_charm,
-            application_name=f"{IP_ROUTER_REQUIRER_APP_NAME}-a",
+            application_name=IP_ROUTER_REQUIRER_APP_NAME,
             series="jammy",
         )
         await ops_test.model.wait_for_idle(
-            apps=[f"{IP_ROUTER_REQUIRER_APP_NAME}-a", IP_ROUTER_PROVIDER_APP_NAME],
+            apps=[IP_ROUTER_REQUIRER_APP_NAME, IP_ROUTER_PROVIDER_APP_NAME],
             status="blocked",
             timeout=1000,
         )
 
     @pytest.mark.abort_on_fail
     async def test_given_charms_deployed_when_relate_then_status_is_active(self, ops_test):
-        await ops_test.model.add_relation(
-            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-a:{IP_ROUTER_REQUIRER_RELATION_NAME}-a",
+        await ops_test.model.integrate(
+            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}:{IP_ROUTER_REQUIRER_RELATION_NAME}",
             relation2=f"{IP_ROUTER_PROVIDER_APP_NAME}:{IP_ROUTER_PROVIDER_RELATION_NAME}",
         )
 
         await ops_test.model.wait_for_idle(
-            apps=[f"{IP_ROUTER_REQUIRER_APP_NAME}-a", IP_ROUTER_PROVIDER_APP_NAME],
+            apps=[IP_ROUTER_REQUIRER_APP_NAME, IP_ROUTER_PROVIDER_APP_NAME],
             status="active",
             timeout=1000,
         )
@@ -81,13 +81,12 @@ class TestIntegration:
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
-        assert json.loads(action_output["msg"]) == {f"{IP_ROUTER_REQUIRER_RELATION_NAME}-a": []}
+        assert json.loads(action_output["msg"]) == {}
 
     @pytest.mark.abort_on_fail
     async def test_given_network_request_provider_implements_and_requirer_sees(self, ops_test):
-        # This emits an event called new_network_request
         provider_unit = ops_test.model.units[f"{IP_ROUTER_PROVIDER_APP_NAME}/0"]
-        requirer_unit = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}-a/0"]
+        requirer_unit = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}/0"]
 
         # Run a "request-network" action on the requirer charm
         requested_network = [{"network": "192.168.250.0/24", "gateway": "192.168.250.1"}]
@@ -101,7 +100,7 @@ class TestIntegration:
 
         # Wait for the model to finish executing `relation-changed`
         await ops_test.model.wait_for_idle(
-            apps=[f"{IP_ROUTER_REQUIRER_APP_NAME}-a", IP_ROUTER_PROVIDER_APP_NAME],
+            apps=[IP_ROUTER_REQUIRER_APP_NAME, IP_ROUTER_PROVIDER_APP_NAME],
             status="active",
             timeout=1000,
         )
@@ -127,13 +126,13 @@ class TestIntegration:
             status="blocked",
             timeout=1000,
         )
-        await ops_test.model.add_relation(
+        await ops_test.model.integration(
             relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-b:{IP_ROUTER_REQUIRER_RELATION_NAME}-b",
             relation2=f"{IP_ROUTER_PROVIDER_APP_NAME}:{IP_ROUTER_PROVIDER_RELATION_NAME}",
         )
         await ops_test.model.wait_for_idle(
             apps=[
-                f"{IP_ROUTER_REQUIRER_APP_NAME}-a",
+                IP_ROUTER_REQUIRER_APP_NAME,
                 f"{IP_ROUTER_REQUIRER_APP_NAME}-b",
                 IP_ROUTER_PROVIDER_APP_NAME,
             ],
@@ -146,13 +145,10 @@ class TestIntegration:
             action_uuid=action.entity_id, wait=60
         )
         assert json.loads(action_output["msg"]) == {
-            "ip-router-requirer-a": json.dumps(
-                [{"network": "192.168.250.0/24", "gateway": "192.168.250.1"}]
-            ),
-            "ip-router-requirer-b": [],
+            "example-host": [{"network": "192.168.250.0/24", "gateway": "192.168.250.1"}]
         }
 
-        requirer_unit_1 = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}-a/0"]
+        requirer_unit_1 = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}/0"]
         requirer_unit_2 = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}-b/0"]
 
         # requirer1 sends a network request
@@ -164,7 +160,7 @@ class TestIntegration:
         # Wait for all apps to be done
         await ops_test.model.wait_for_idle(
             apps=[
-                f"{IP_ROUTER_REQUIRER_APP_NAME}-a",
+                IP_ROUTER_REQUIRER_APP_NAME,
                 f"{IP_ROUTER_REQUIRER_APP_NAME}-b",
                 IP_ROUTER_PROVIDER_APP_NAME,
             ],
@@ -177,10 +173,7 @@ class TestIntegration:
             {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
         ]
         expected_rt = {
-            "ip-router-requirer-a": json.dumps(
-                [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}]
-            ),
-            "ip-router-requirer-b": [],
+            "example-host": [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}],
         }
 
         action = await provider_unit.run_action(action_name="get-routing-table")
@@ -208,7 +201,7 @@ class TestIntegration:
         # Wait for all apps to be done
         await ops_test.model.wait_for_idle(
             apps=[
-                f"{IP_ROUTER_REQUIRER_APP_NAME}-a",
+                IP_ROUTER_REQUIRER_APP_NAME,
                 f"{IP_ROUTER_REQUIRER_APP_NAME}-b",
                 IP_ROUTER_PROVIDER_APP_NAME,
             ],
@@ -221,12 +214,8 @@ class TestIntegration:
             {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
         ]
         expected_rt = {
-            "ip-router-requirer-a": json.dumps(
-                [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}]
-            ),
-            "ip-router-requirer-b": json.dumps(
-                [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}]
-            ),
+            "example-host": [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}],
+            "example-host-b": [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}],
         }
 
         action = await provider_unit.run_action(action_name="get-routing-table")

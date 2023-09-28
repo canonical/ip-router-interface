@@ -240,7 +240,6 @@ class TestRequirer(unittest.TestCase):
         rel_id = harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
         harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         assert harness.charm.RouterRequirer.get_all_networks() == []
 
     def test_get_routing_table_multiple_networks(self):
@@ -265,7 +264,6 @@ class TestRequirer(unittest.TestCase):
             rel_id, "ip-router-provider", {"networks": json.dumps(existing_network)}
         )
 
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         assert harness.charm.RouterRequirer.get_all_networks() == existing_network
 
     def test_get_routing_table_multiple_networks_and_providers(self):
@@ -298,7 +296,6 @@ class TestRequirer(unittest.TestCase):
         harness.update_relation_data(
             rel_2_id, "ip-router-provider-b", {"networks": json.dumps(existing_network_2)}
         )
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         assert (
             harness.charm.RouterRequirer.get_all_networks()
             == existing_network_1 + existing_network_2
@@ -318,7 +315,6 @@ class TestRequirer(unittest.TestCase):
                 "gateway": "192.168.252.1",
             }
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         harness.charm.RouterRequirer.request_network(network_request)
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {
@@ -338,7 +334,6 @@ class TestRequirer(unittest.TestCase):
             {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
             {"network": "192.168.250.0/24", "gateway": "192.168.250.1"},
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
         harness.charm.RouterRequirer.request_network(network_request)
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {
@@ -356,11 +351,8 @@ class TestRequirer(unittest.TestCase):
                 "gateway": "192.168.252.1",
             }
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
-        try:
+        with self.assertRaises(RuntimeError):
             harness.charm.RouterRequirer.request_network(network_request)
-        except RuntimeError as e:
-            assert e.args[0] == "No ip-router relation exists yet."
 
     def test_request_new_network_with_ip_conflicts(self):
         harness = self._setup()
@@ -381,11 +373,8 @@ class TestRequirer(unittest.TestCase):
         network_request = [
             {"network": "192.168.240.0/20", "gateway": "192.168.250.1"},
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
-        try:
+        with self.assertRaises(ValueError):
             harness.charm.RouterRequirer.request_network(network_request)
-        except ValueError as e:
-            assert e.args[0] == "This network has been defined in a previous entry."
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
@@ -410,11 +399,8 @@ class TestRequirer(unittest.TestCase):
                 "routes": [{"destination": "172.250.0.0/16", "gateway": "192.168.240.3"}],
             }
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
-        try:
+        with self.assertRaises(ValueError):
             harness.charm.RouterRequirer.request_network(network_request)
-        except ValueError as e:
-            assert e.args[0] == "There is no route to this destination from the network."
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
     def test_request_new_network_multiple_with_one_invalid(self):
@@ -442,11 +428,8 @@ class TestRequirer(unittest.TestCase):
                 "gateway": "192.168.251.1",
             },
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
-        try:
+        with self.assertRaises(ValueError):
             harness.charm.RouterRequirer.request_network(network_request)
-        except ValueError as e:
-            assert e.args[0] == "There is no route to this destination from the network."
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
     def test_request_new_network_no_gateway(self):
@@ -460,11 +443,8 @@ class TestRequirer(unittest.TestCase):
         network_request = [
             {"network": "192.168.240.0/20", "sad": "192.168.250.1"},
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
-        try:
+        with self.assertRaises(KeyError):
             harness.charm.RouterRequirer.request_network(network_request)
-        except KeyError as e:
-            assert e.args[0] == "Key 'gateway' not found."
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
@@ -479,11 +459,8 @@ class TestRequirer(unittest.TestCase):
         network_request = [
             {"sad": "192.168.240.0/20", "gateway": "192.168.250.1"},
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
-        try:
+        with self.assertRaises(KeyError):
             harness.charm.RouterRequirer.request_network(network_request)
-        except KeyError as e:
-            assert e.args[0] == "Key 'network' not found."
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
@@ -502,11 +479,8 @@ class TestRequirer(unittest.TestCase):
                 "routes": [{"destinope": "172.250.0.0/16", "gateway": "192.168.240.3"}],
             }
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
-        try:
+        with self.assertRaises(KeyError):
             harness.charm.RouterRequirer.request_network(network_request)
-        except KeyError as e:
-            assert e.args[0] == "Key 'destination' not found in route."
 
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}
 
@@ -525,9 +499,6 @@ class TestRequirer(unittest.TestCase):
                 "routes": [{"destination": "172.250.0.0/16", "gateroad": "192.168.240.3"}],
             }
         ]
-        harness.charm.RouterRequirer.relationship_name = IP_ROUTER_REQUIRER_RELATION_NAME
-        try:
+        with self.assertRaises(KeyError):
             harness.charm.RouterRequirer.request_network(network_request)
-        except KeyError as e:
-            assert e.args[0] == "Key 'gateway' not found in route."
         assert harness.get_relation_data(rel_id, "ip-router-requirer") == {}

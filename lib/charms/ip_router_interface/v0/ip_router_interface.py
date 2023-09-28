@@ -288,16 +288,21 @@ class RouterProvides(Object):
             return
         self._sync_routing_tables()
 
-    def get_routing_table(self):
+    def get_routing_table(self) -> RoutingTable:
         """Build the routing table from all of the related databags. Relations
         that don't have missing or invalid network requests will be ignored.
         """
+        logger.debug("Routing Table generation starting.")
         router_relations = self.model.relations[self.relationship_name]
-        final_routing_table = {}
+        final_routing_table: RoutingTable = {}
         for relation in router_relations:
             new_network_name = relation.data[relation.app].get("network-name", None)
             new_network_request: List[Network] = json.loads(
                 relation.data[relation.app].get("networks", "{}")
+            )
+
+            logger.debug(
+                f"Attempting to add ({new_network_request}) from app:({relation.app.name}) with relation-name:({new_network_name})"
             )
 
             if (
@@ -318,6 +323,8 @@ class RouterProvides(Object):
                     )
                 else:
                     final_routing_table[new_network_name].append(network)
+
+        logger.debug(f"Generated rt: {final_routing_table}")
         return final_routing_table
 
     def get_flattened_routing_table(self) -> List[Network]:
@@ -330,14 +337,15 @@ class RouterProvides(Object):
         final_routing_table: List[Network] = []
         for networks in internal_routing_table.values():
             final_routing_table.extend(networks)
-
+        logger.debug(f"Flattened RT to {final_routing_table}")
         return final_routing_table
 
     def _sync_routing_tables(self) -> None:
         """Syncs the internal routing table with all of the requirer's app databags"""
-        logger.info("Rescnchronizing routing tables")
         routing_table = self.get_flattened_routing_table()
+        logger.info(f"Resynchronizing routing tables with {routing_table}")
         for relation in self.model.relations[self.relationship_name]:
+            logger.info(f"Updated {relation.app.name} with new routing table")
             relation.data[self.charm.app].update({"networks": json.dumps(routing_table)})
 
 
@@ -402,6 +410,7 @@ class RouterRequires(Object):
         router_relations = self.model.relations.get(self.relationship_name)
         all_networks = []
         for relation in router_relations:
+            logger.info(f"Reading app:({relation.app.name}) from ({self.relationship_name})")
             if networks := relation.data[relation.app].get("networks"):
                 all_networks.extend(json.loads(networks))
         return all_networks

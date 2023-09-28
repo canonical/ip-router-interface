@@ -3,7 +3,7 @@ description: ip-router-requirer.
 summary: ip-router-requirer.
 
 requires:
-  example-host-a:
+  example-host:
     interface: ip-router
 
   example-host-b:
