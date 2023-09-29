@@ -42,7 +42,7 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         super().__init__(*args)
         self.RouterProvider = RouterProvides(charm=self)
         self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.routing_table_updated, self._routing_table_updated)
+        self.framework.observe(self.RouterProvider.on.routing_table_updated, self._routing_table_updated)
         self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
 
     def _on_install(self, event: ops.InstallEvent):
@@ -90,6 +90,7 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         self.RouterRequirer = RouterRequires(charm=self)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.ip_router_relation_joined, self._on_relation_joined)
+        self.framework.observe(self.RouterProvider.on.routing_table_updated, self._routing_table_updated)
 
         self.framework.observe(self.on.get_all_networks_action, self._action_get_all_networks)
         self.framework.observe(self.on.request_network_action, self._action_request_network)
@@ -100,8 +101,12 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
     def _on_relation_joined(self, event: ops.RelationJoinedEvent):
         self.unit.status = ops.ActiveStatus("Ready to Require")
 
+    def _routing_table_updated(self, event: RoutingTableUpdatedEvent):
+        # Get and process all of the available networks when they're updated
+        all_networks = self.RouterRequirer.get_all_networks()
+
     def _action_get_all_networks(self, event: ops.ActionEvent):
-        # Get and process all of the available networks
+        # Get and process all of the available networks any time you like
         all_networks = self.RouterRequirer.get_all_networks()
         event.set_results({"msg": json.dumps(all_networks)})
 
@@ -173,6 +178,10 @@ class RoutingTableUpdatedEvent(EventBase):
 
 
 class RouterProviderCharmEvents(ObjectEvents):
+    routing_table_updated = EventSource(RoutingTableUpdatedEvent)
+
+
+class RouterRequirerCharmEvents(ObjectEvents):
     routing_table_updated = EventSource(RoutingTableUpdatedEvent)
 
 
@@ -366,10 +375,18 @@ class RouterRequires(Object):
         charm: The Charm object that instantiates this class.
     """
 
+    on = RouterRequirerCharmEvents()
+
     def __init__(self, charm: CharmBase, relationship_name: str = "ip-router"):
         super().__init__(charm, relationship_name)
         self.charm = charm
         self.relationship_name = relationship_name
+        self.framework.observe(
+            charm.on[relationship_name].relation_changed, self._router_relation_changed
+        )
+
+    def _router_relation_changed(self, event: RelationChangedEvent):
+        self.on.routing_table_updated.emit()
 
     def request_network(self, networks: List[Network], custom_network_name: str = None) -> None:
         """Requests a new network interface from the ip-router provider
