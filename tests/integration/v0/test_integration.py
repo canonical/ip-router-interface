@@ -79,7 +79,9 @@ class TestIntegration:
         await validate_routing_table(provider_unit, {}, ops_test)
 
     @pytest.mark.abort_on_fail
-    async def test_given_network_request_provider_implements_and_requirer_sees(self, ops_test):
+    async def test_given_related_charms_when_requirer_requests_network_then_provider_implements_and_requirer_sees(
+        self, ops_test
+    ):
         provider_unit = ops_test.model.units[f"{IP_ROUTER_PROVIDER_APP_NAME}/0"]
         requirer_unit = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}/0"]
 
@@ -109,7 +111,9 @@ class TestIntegration:
         assert json.loads(action_output["msg"]) == requested_network
 
     @pytest.mark.abort_on_fail
-    async def test_full_end2end_test(self, ops_test):
+    async def test_given_two_requirers_one_provider_when_new_network_requests_both_requirers_sees_updated_network(
+        self, ops_test
+    ):
         # Deploy and relate another requirer
         await ops_test.model.deploy(
             TestIntegration.requirer_charm,
