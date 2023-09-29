@@ -6,9 +6,10 @@ import json
 import logging
 import os
 import shutil
-from ops.model import Unit
 from typing import Any
+
 import pytest
+from ops.model import Unit
 
 logger = logging.getLogger(__name__)
 
