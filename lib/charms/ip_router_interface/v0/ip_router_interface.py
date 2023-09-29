@@ -237,7 +237,8 @@ def _network_name_taken(name: str, relations: List[Relation]):
 
     if count > 1:
         logger.error(
-            f"There are multiple relations with the name {name}. Please change one or provide a custom network name."
+            "There are multiple relations with the name (%s). Please change one or provide a custom network name.",
+            name,
         )
         return True
     return False
@@ -302,7 +303,10 @@ class RouterProvides(Object):
             )
 
             logger.debug(
-                f"Attempting to add ({new_network_request}) from app:({relation.app.name}) with relation-name:({new_network_name})"
+                "Attempting to add (%s) from app:(%s) with relation-name:(%s)",
+                new_network_request,
+                relation.app.name,
+                new_network_name,
             )
 
             if (
@@ -319,12 +323,14 @@ class RouterProvides(Object):
                     _validate_network(network, final_routing_table)
                 except (ValueError, KeyError) as e:
                     logger.error(
-                        f"Exception ({e.args[0]}) occurred with network {network}. Skipping this entry."
+                        "Exception (%s) occurred with network %s. Skipping this entry.",
+                        e.args[0],
+                        network,
                     )
                 else:
                     final_routing_table[new_network_name].append(network)
 
-        logger.debug(f"Generated rt: {final_routing_table}")
+        logger.debug("Generated rt: %s", final_routing_table)
         return final_routing_table
 
     def get_flattened_routing_table(self) -> List[Network]:
@@ -337,15 +343,14 @@ class RouterProvides(Object):
         final_routing_table: List[Network] = []
         for networks in internal_routing_table.values():
             final_routing_table.extend(networks)
-        logger.debug(f"Flattened RT to {final_routing_table}")
+        logger.debug("Flattened RT to %s", final_routing_table)
         return final_routing_table
 
     def _sync_routing_tables(self) -> None:
         """Syncs the internal routing table with all of the requirer's app databags"""
         routing_table = self.get_flattened_routing_table()
-        logger.info(f"Resynchronizing routing tables with {routing_table}")
+        logger.info("Resynchronizing routing tables with %s", routing_table)
         for relation in self.model.relations[self.relationship_name]:
-            logger.info(f"Updated {relation.app.name} with new routing table")
             relation.data[self.charm.app].update({"networks": json.dumps(routing_table)})
 
 
@@ -392,6 +397,10 @@ class RouterRequires(Object):
             _validate_network(network_request, {"existing-networks": self.get_all_networks()})
 
         # Place it in the databags
+        logger.debug(
+            "Requesting new network from the routers %s",
+            str([r.name for r in ip_router_relations]),
+        )
         for relation in ip_router_relations:
             network_name = custom_network_name if custom_network_name else relation.name
             relation.data[self.charm.app].update({"networks": json.dumps(networks)})
@@ -410,7 +419,11 @@ class RouterRequires(Object):
         router_relations = self.model.relations.get(self.relationship_name)
         all_networks = []
         for relation in router_relations:
-            logger.info(f"Reading app:({relation.app.name}) from ({self.relationship_name})")
+            logger.debug(
+                f"Reading networks from app: (%s) and relation: (%s)",
+                relation.app.name,
+                self.relationship_name,
+            )
             if networks := relation.data[relation.app].get("networks"):
                 all_networks.extend(json.loads(networks))
         return all_networks
