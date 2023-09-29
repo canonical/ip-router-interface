@@ -27,7 +27,8 @@ The library handles the listening and synchronization for all of the ip-router n
 requests internally, which means as the charm author you don't need to worry about any
 of the business logic of validating or orchestrating the relation network.
 
-You can also listen to the `routing_table_updated` event for convenience.
+You can also listen to the `routing_table_updated` event that is emitted after the 
+tables are synced.
 
 
 ```python
