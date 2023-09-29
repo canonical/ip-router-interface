@@ -176,6 +176,16 @@ class RoutingTableUpdatedEvent(EventBase):
     Charm event for when a host registers a route to an existing interface in the router
     """
 
+    def __init__(self, handle, data=None):
+        super().__init__(handle)
+        self.data = data
+
+    def snapshot(self):
+        return {"data": self.data}
+
+    def restore(self, snapshot):
+        self.data = snapshot["data"]
+
 
 class RouterProviderCharmEvents(ObjectEvents):
     routing_table_updated = EventSource(RoutingTableUpdatedEvent)
@@ -289,7 +299,8 @@ class RouterProvides(Object):
         if not self.charm.unit.is_leader():
             return
         self._sync_routing_tables()
-        self.on.routing_table_updated.emit()
+        new_table = self.get_flattened_routing_table()
+        self.on.routing_table_updated.emit({"networks": new_table})
 
     def _router_relation_departed(self, event: RelationDepartedEvent):
         """If an application has completely departed the relation, remove it
@@ -312,13 +323,6 @@ class RouterProvides(Object):
                 relation.data[relation.app].get("networks", "{}")
             )
 
-            logger.debug(
-                "Attempting to add (%s) from app:(%s) with relation-name:(%s)",
-                new_network_request,
-                relation.app.name,
-                new_network_name,
-            )
-
             if (
                 not new_network_name
                 or not new_network_request
@@ -339,12 +343,31 @@ class RouterProvides(Object):
                     )
                 else:
                     final_routing_table[new_network_name].append(network)
+                    logger.debug(
+                        "Added (%s) from app:(%s) with relation-name:(%s)",
+                        new_network_request,
+                        relation.app.name,
+                        new_network_name,
+                    )
 
         logger.debug("Generated rt: %s", final_routing_table)
         return final_routing_table
 
     def get_flattened_routing_table(self) -> List[Network]:
         """Returns a read-only routing table that's flattened to fit the specification.
+        The routing table is in the form of
+        {
+            app1_name: list_of_networks_1,
+            app2_name: list_of_networks_2,
+            ...
+        }
+
+        A flattened table looks like
+        [
+            *list_of_networks_1,
+            *list_of_networks_2,
+            ...
+        ]
 
         Returns:
             A list of objects of type `Network`
@@ -359,9 +382,9 @@ class RouterProvides(Object):
     def _sync_routing_tables(self) -> None:
         """Syncs the internal routing table with all of the requirer's app databags"""
         routing_table = self.get_flattened_routing_table()
-        logger.info("Resynchronizing routing tables with %s", routing_table)
         for relation in self.model.relations[self.relationship_name]:
             relation.data[self.charm.app].update({"networks": json.dumps(routing_table)})
+        logger.info("Resynchronized routing tables with %s", routing_table)
 
 
 class RouterRequires(Object):
@@ -386,7 +409,8 @@ class RouterRequires(Object):
         )
 
     def _router_relation_changed(self, event: RelationChangedEvent):
-        self.on.routing_table_updated.emit()
+        new_table = self.get_all_networks()
+        self.on.routing_table_updated.emit({"networks": new_table})
 
     def request_network(self, networks: List[Network], custom_network_name: str = None) -> None:
         """Requests a new network interface from the ip-router provider
@@ -415,14 +439,15 @@ class RouterRequires(Object):
             _validate_network(network_request, {"existing-networks": self.get_all_networks()})
 
         # Place it in the databags
-        logger.debug(
-            "Requesting new network from the routers %s",
-            str([r.name for r in ip_router_relations]),
-        )
+
         for relation in ip_router_relations:
             network_name = custom_network_name if custom_network_name else relation.name
             relation.data[self.charm.app].update({"networks": json.dumps(networks)})
             relation.data[self.charm.app].update({"network-name": network_name})
+        logger.debug(
+            "Requested new network from the routers %s",
+            str([r.name for r in ip_router_relations]),
+        )
 
     def get_all_networks(self) -> List[Network]:
         """Fetches combined routing tables made available by ip-router providers
@@ -437,11 +462,11 @@ class RouterRequires(Object):
         router_relations = self.model.relations.get(self.relationship_name)
         all_networks = []
         for relation in router_relations:
+            if networks := relation.data[relation.app].get("networks"):
+                all_networks.extend(json.loads(networks))
             logger.debug(
-                f"Reading networks from app: (%s) and relation: (%s)",
+                f"Read networks from app: (%s) and relation: (%s)",
                 relation.app.name,
                 self.relationship_name,
             )
-            if networks := relation.data[relation.app].get("networks"):
-                all_networks.extend(json.loads(networks))
         return all_networks
