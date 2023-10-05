@@ -71,11 +71,8 @@ This example requirer charm shows the two available actions as a host in the net
 * get the latest list of all networks available from the provider
 * request a network to be assigned to the requirer charm
 
-The ip-router requirer allows a foolproof, typechecked, secure and safe way to 
-interact with the router that handles validation and format of the network 
-request, so you can focus on more important things. The library also provides a
-way to list out all of the available networks. This list is not cached, and comes
-directly from the provider.
+The library also provides a way to list out all of the available networks.
+This list is not cached, and comes directly from the provider.
 
 ```python
 import logging, json
