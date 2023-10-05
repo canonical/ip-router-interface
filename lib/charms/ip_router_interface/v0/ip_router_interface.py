@@ -71,8 +71,11 @@ This example requirer charm shows the two available actions as a host in the net
 * get the latest list of all networks available from the provider
 * request a network to be assigned to the requirer charm
 
-The library also provides a way to list out all of the available networks.
-This list is not cached, and comes directly from the provider.
+The ip-router requirer allows a foolproof, typechecked, secure and safe way to 
+interact with the router that handles validation and format of the network 
+request, so you can focus on more important things. The library also provides a
+way to list out all of the available networks. This list is not cached, and comes
+directly from the provider.
 
 ```python
 import logging, json
@@ -136,7 +139,6 @@ LIBAPI = 0
 LIBPATCH = 2
 
 from ipaddress import IPv4Address, IPv4Network
-from copy import deepcopy
 from typing import Dict, List, Union, TypeAlias
 from ops.framework import Object, EventSource, EventBase, ObjectEvents
 from ops.charm import CharmBase
@@ -435,8 +437,6 @@ class RouterRequires(Object):
         for network_request in networks:
             _validate_network(network_request, {"existing-networks": self.get_all_networks()})
 
-        # Place it in the databags
-
         for relation in ip_router_relations:
             network_name = custom_network_name if custom_network_name else relation.name
             relation.data[self.charm.app].update({"networks": json.dumps(networks)})
@@ -460,7 +460,17 @@ class RouterRequires(Object):
         all_networks = []
         for relation in router_relations:
             if networks := relation.data[relation.app].get("networks"):
-                all_networks.extend(json.loads(networks))
+                for network in json.loads(networks):
+                    try:
+                        _validate_network(network, {"existing-networks": all_networks})
+                    except (ValueError, KeyError) as e:
+                        logger.warning(
+                            "Malformed network detected in the databag:\nNetwork: (%s)\nError: (%s)",
+                            network,
+                            e.args[0],
+                        )
+                    else:
+                        all_networks.append(network)
             logger.debug(
                 f"Read networks from app: (%s) and relation: (%s)",
                 relation.app.name,

@@ -252,7 +252,7 @@ class TestRequirer(unittest.TestCase):
                 "routes": [{"destination": "172.250.0.0/16", "gateway": "192.168.250.3"}],
             },
             {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
-            {"network": "192.168.251.0/24", "gateway": "192.168.251.1/24"},
+            {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
         ]
 
         self.harness.update_relation_data(
@@ -288,7 +288,7 @@ class TestRequirer(unittest.TestCase):
         # Create network 2
         existing_network_2 = [
             {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
-            {"network": "192.168.251.0/24", "gateway": "192.168.251.1/24"},
+            {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
         ]
         self.harness.update_relation_data(
             rel_2_id, "ip-router-provider-b", {"networks": json.dumps(existing_network_2)}
