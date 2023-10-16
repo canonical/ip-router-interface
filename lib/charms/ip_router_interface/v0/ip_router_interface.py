@@ -139,18 +139,15 @@ LIBAPI = 0
 LIBPATCH = 2
 
 from ipaddress import IPv4Address, IPv4Network
-from typing import Dict, List, Union, TypeAlias, Optional
+from typing import Dict, List, Union, TypeAlias
 from ops.framework import Object, EventSource, EventBase, ObjectEvents
 from ops.charm import CharmBase
 from ops import RelationChangedEvent, RelationDepartedEvent, Relation
-from collections import defaultdict
-from itertools import chain
 import logging, json
-from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-NetworkType: TypeAlias = Dict[
+Network: TypeAlias = Dict[
     str,  # 'network' | 'gateway' | 'routes'
     Union[
         IPv4Address,  # gateway, ex: '192.168.250.1'
@@ -167,72 +164,10 @@ NetworkType: TypeAlias = Dict[
     ],
 ]
 
-RoutingTableType: TypeAlias = Dict[
+RoutingTable: TypeAlias = Dict[
     str,  # Name of the application
-    List[NetworkType],  # All networks for this application
+    List[Network],  # All networks for this application
 ]
-
-
-@dataclass
-class Route:
-    """Class for defining a route within a network"""
-
-    destination: IPv4Network
-    gateway: IPv4Address
-
-    def __init__(self, destination: str, gateway: str):
-        self.destination = IPv4Network(destination)
-        self.gateway = IPv4Address(gateway)
-
-
-@dataclass
-class Network:  # TODO You can do Network(**network_dict_from_databag)
-    """Class for defining a network"""
-
-    subnet: IPv4Network
-    gateway: IPv4Address
-    routes: List[Route]
-
-    def __init__(self, network: str, gateway: str, routes: List[Dict[str, str]] = []):
-        self.subnet = IPv4Network(network)
-        self.gateway = IPv4Address(gateway)
-        self.routes = [Route(**r) for r in routes]
-
-        if self.gateway not in self.subnet:
-            raise ValueError("Chosen gateway not within given network.")
-
-        for route in self.routes:
-            if route.gateway not in self.subnet:
-                raise ValueError("There is no route to this destination from the network.")
-
-
-@dataclass
-class RoutingTable:
-    """Routing table that represents all of the connected hosts"""
-
-    networks: Dict[str, List[Network]]
-
-    def __init__(self):
-        self.networks = defaultdict(list)
-
-    def get(self) -> Dict[str, List[Network]]:
-        return self.networks
-
-    def get_flattened(self) -> List[Network]:
-        return list(chain(self.networks.values()))
-
-    def add_network(self, network_name: str, network: str):
-        new_network = Network(**network)
-
-        # Networks should be mutually exclusive within the routing table
-        for existing_network in self.get_flattened():
-            old_subnet = existing_network.subnet
-            new_subnet = new_network.subnet
-
-            if old_subnet.subnet_of(new_subnet) or old_subnet.supernet_of(new_subnet):
-                raise ValueError("This network has been defined in a previous entry.")
-
-        self.networks[network_name].append(new_network)
 
 
 class RoutingTableUpdatedEvent(EventBase):
@@ -259,9 +194,7 @@ class RouterRequirerCharmEvents(ObjectEvents):
     routing_table_updated = EventSource(RoutingTableUpdatedEvent)
 
 
-def _validate_network(
-    network_request: NetworkType, existing_routing_table: RoutingTableType
-) -> bool:
+def _validate_network(network_request: Network, existing_routing_table: RoutingTable) -> bool:
     """Validates the network configuration created by the ip-router requirer
 
     The requested network must have all of the required fields, the gateway
@@ -375,19 +308,17 @@ class RouterProvides(Object):
         if not self.charm.unit.is_leader():
             return
         self._sync_routing_tables()
-        new_table = self.get_flattened_routing_table()
-        self.on.routing_table_updated.emit({"networks": new_table})
 
-    def get_routing_table(self) -> RoutingTableType:
+    def get_routing_table(self) -> RoutingTable:
         """Build the routing table from all of the related databags. Relations
         that don't have missing or invalid network requests will be ignored.
         """
         logger.debug("Routing Table generation starting.")
         router_relations = self.model.relations[self.relationship_name]
-        final_routing_table: RoutingTableType = {}
+        final_routing_table: RoutingTable = {}
         for relation in router_relations:
             new_network_name = relation.data[relation.app].get("network-name", None)
-            new_network_request: List[NetworkType] = json.loads(
+            new_network_request: List[Network] = json.loads(
                 relation.data[relation.app].get("networks", "{}")
             )
 
@@ -421,7 +352,7 @@ class RouterProvides(Object):
         logger.debug("Generated rt: %s", final_routing_table)
         return final_routing_table
 
-    def get_flattened_routing_table(self) -> List[NetworkType]:
+    def get_flattened_routing_table(self) -> List[Network]:
         """Returns a read-only routing table that's flattened to fit the specification.
         The routing table is in the form of
         {
@@ -441,7 +372,7 @@ class RouterProvides(Object):
             A list of objects of type `Network`
         """
         internal_routing_table = self.get_routing_table()
-        final_routing_table: List[NetworkType] = []
+        final_routing_table: List[Network] = []
         for networks in internal_routing_table.values():
             final_routing_table.extend(networks)
         logger.debug("Flattened RT to %s", final_routing_table)
@@ -480,9 +411,7 @@ class RouterRequires(Object):
         new_table = self.get_all_networks()
         self.on.routing_table_updated.emit({"networks": new_table})
 
-    def request_network(
-        self, networks: List[NetworkType], custom_network_name: str = None
-    ) -> None:
+    def request_network(self, networks: List[Network], custom_network_name: str = None) -> None:
         """Requests a new network interface from the ip-router provider
 
         The interfaces must be valid according to `_network_is_valid`. Multiple
@@ -517,7 +446,7 @@ class RouterRequires(Object):
             str([r.name for r in ip_router_relations]),
         )
 
-    def get_all_networks(self) -> List[NetworkType]:
+    def get_all_networks(self) -> List[Network]:
         """Fetches combined routing tables made available by ip-router providers
 
         Returns:
