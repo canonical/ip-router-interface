@@ -421,6 +421,9 @@ class RouterRequires(Object):
         Arguments:
             networks:
                 A list containing the desired networks of the type `Network`.
+            custom_network_name:
+                A string to use as the name of the network. Defaults to the relation
+                name.
 
         Raises:
             RuntimeError:

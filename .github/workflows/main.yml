@@ -1,73 +1,18 @@
 name: CI
 
 on:
-  push:
+  pull_request: 
 
 jobs:
   lint-report:
-    name: Lint report
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-      - name: Install tox
-        run: pip install tox
-      - name: Run tests using tox
-        run: tox -e lint
+    uses: ./.github/workflows/lint-report.yaml
 
   static-analysis:
-    name: Static analysis
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-      - name: Install tox
-        run: pip install tox
-      - name: Run tests using tox
-        run: tox -e static
+    uses: ./.github/workflows/static-analysis.yaml
+  
 
   unit-tests-with-coverage:
-    name: Unit tests
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-      - name: Install tox
-        run: pip install tox
-      - name: Run tests using tox
-        run: tox -e unit
+    uses: ./.github/workflows/unit-tests-with-coverage.yaml
 
   integration-tests:
-    name: Integration tests
-    runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        juju: ["3.1/stable"]
-        include:
-          - libjuju: "3.1.2.0"
-            juju: "3.1/stable"
-            microk8s: "1.27-strict/stable"
-    steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-      - name: Install tox
-        run: pip install tox
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          juju-channel: ${{ matrix.juju }}
-          provider: microk8s
-          channel: ${{ matrix.microk8s }}
-      - name: Run tests using tox
-        run: tox -e integration
-        env:
-          LIBJUJU_VERSION: ${{ matrix.libjuju }}
-      - name: Archive charmcraft logs
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: charmcraft-logs
-          path: /home/runner/.local/state/charmcraft/log/*.log
-      - name: Archive juju crashdump
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: juju-crashdump
-          path: juju-crashdump-*.tar.xz
+    uses: ./.github/workflows/integration-tests.yaml

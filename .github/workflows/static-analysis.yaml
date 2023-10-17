@@ -1,0 +1,15 @@
+name: Static Analysis
+
+on:
+    workflow_call:
+
+jobs:
+    static-analysis:
+        name: Static analysis
+        runs-on: ubuntu-22.04
+        steps:
+          - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+          - name: Install tox
+            run: pip install tox
+          - name: Run tests using tox
+            run: tox -e static
