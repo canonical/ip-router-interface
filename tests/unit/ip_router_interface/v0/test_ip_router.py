@@ -1,7 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import json
-import logging
 import os
 import shutil
 import unittest

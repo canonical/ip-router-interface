@@ -49,8 +49,7 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus("Ready to Provide")
 
     def _routing_table_updated(self, event: RoutingTableUpdatedEvent):
-        routing_table = self.RouterProvider.get_routing_table()
-        all_networks = self.RouterProvider.get_flattened_routing_table()
+        routing_table = event.routing_table
 
         # Process the networks however you like
         implement_networks(all_networks)
@@ -175,15 +174,15 @@ class RoutingTableUpdatedEvent(EventBase):
     Charm event for when a host registers a route to an existing interface in the router
     """
 
-    def __init__(self, handle, data=None):
+    def __init__(self, handle, routing_table=None):
         super().__init__(handle)
-        self.data = data
+        self.routing_table = routing_table
 
     def snapshot(self):
-        return {"data": self.data}
+        return {"data": self.routing_table}
 
     def restore(self, snapshot):
-        self.data = snapshot["data"]
+        self.routing_table = snapshot["data"]
 
 
 class RouterProviderCharmEvents(ObjectEvents):
