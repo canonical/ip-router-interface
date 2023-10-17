@@ -20,8 +20,6 @@ from tests.requirer_charm.src.charm import (
     SimpleIPRouteRequirerCharm,
 )
 
-logger = logging.getLogger(__name__)
-
 LIB_DIR = "lib/charms/ip_router_interface/v0"
 LIB_NAME = "ip_router_interface.py"
 REQUIRER_CHARM_DIR = "tests/requirer_charm"
