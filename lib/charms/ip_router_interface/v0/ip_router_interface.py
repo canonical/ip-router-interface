@@ -194,7 +194,7 @@ class RouterRequirerCharmEvents(ObjectEvents):
     routing_table_updated = EventSource(RoutingTableUpdatedEvent)
 
 
-def _validate_network(network_request: Network, existing_routing_table: RoutingTable) -> bool:
+def _validate_network(network_request: Network, existing_routing_table: RoutingTable):
     """Validates the network configuration created by the ip-router requirer
 
     The requested network must have all of the required fields, the gateway
@@ -248,7 +248,7 @@ def _validate_network(network_request: Network, existing_routing_table: RoutingT
                 raise ValueError("This network has been defined in a previous entry.")
 
 
-def _network_name_taken(name: str, relations: List[Relation]):
+def _network_name_taken(name: str, relations: List[Relation]) -> bool:
     count = 0
     for relation in relations:
         if name == relation.data[relation.app].get("network-name"):
@@ -267,16 +267,18 @@ class RouterProvides(Object):
     """This class is used to manage the routing table of the router provider.
 
     It's capabilities are to:
-    * Manage the routing table in the charm itself, by adding and removing
-    new network and route requests by integrated units,
-    * Synchronize the databags of all requiring units with the router table of the
-    provider charm.
+    * Build a Routing Table from all of the databags of the requirers with their
+    declared networks.
+    * Synchronize the databags of all requiring units with the aforementioned
+    routing table.
+    * Send events indicating a change in this table.
 
     Attributes:
         charm:
             The Charm object that instantiates this class.
         relationship_name:
-            The name used for the relationship implementing the ip-router interface
+            The name used for the relationship implementing the ip-router interface.
+            All requirers that integrate to this name are grouped into one routing table.
             "ip-router" by default.
     """
 
@@ -313,7 +315,6 @@ class RouterProvides(Object):
         """Build the routing table from all of the related databags. Relations
         that don't have missing or invalid network requests will be ignored.
         """
-        logger.debug("Routing Table generation starting.")
         router_relations = self.model.relations[self.relationship_name]
         final_routing_table: RoutingTable = {}
         for relation in router_relations:
