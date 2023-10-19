@@ -1,0 +1,10 @@
+name: ip-router-requirer
+description: ip-router-requirer.
+summary: ip-router-requirer.
+
+requires:
+  example-host:
+    interface: ip-router
+
+  example-host-b:
+    interface: ip-router

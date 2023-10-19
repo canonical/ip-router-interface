@@ -1,0 +1,9 @@
+get-routing-table:
+  description: get the current routing table
+
+request-network:
+  description: request a new network
+  params:
+    network:
+      type: string
+      description: the requested network

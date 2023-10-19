@@ -1,0 +1,5 @@
+get-routing-table:
+  description: get the current routing table
+
+get-flattened-routing-table:
+  description: get the flattened routing table

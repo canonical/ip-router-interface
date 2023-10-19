@@ -1,0 +1,18 @@
+name: CI
+
+on:
+  pull_request: 
+
+jobs:
+  lint-report:
+    uses: ./.github/workflows/lint-report.yaml
+
+  static-analysis:
+    uses: ./.github/workflows/static-analysis.yaml
+  
+
+  unit-tests-with-coverage:
+    uses: ./.github/workflows/unit-tests-with-coverage.yaml
+
+  integration-tests:
+    uses: ./.github/workflows/integration-tests.yaml

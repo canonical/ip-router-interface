@@ -1,0 +1,7 @@
+name: ip-router-provider
+description: ip-router-provider.
+summary: ip-router-provider.
+
+provides:
+  example-router:
+    interface: ip-router
