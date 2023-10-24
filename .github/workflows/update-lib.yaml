@@ -1,4 +1,4 @@
-name: Update ip-router-interface
+name: Publish Libs
 
 on:
   push:
@@ -6,22 +6,25 @@ on:
       - "main"
 
 jobs:
-  charmhub-upload:
+  ip-router-lib-needs-publishing:
     runs-on: ubuntu-22.04
-    name: Charmhub upload lib
+    outputs:
+      needs-publishing: ${{ steps.changes.outputs.iprouter }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-
-      - uses: canonical/charming-actions/upload-charm@2.4.0
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
         with:
-          credentials: "${{ secrets.CHARMCRAFT_AUTH }}"
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
-          channel: "edge"
-          upload-image: "false"
+          filters: |
+            iprouter:
+              - 'lib/charms/ip_router_interface/v0/ip_router_interface.py'
 
-      - name: Publish libs
-        env:
-          CHARMCRAFT_AUTH: "${{ secrets.CHARMCRAFT_AUTH }}"
-        run: |
-          charmcraft publish-lib charms.ip_router_interface.v0.ip_router_interface
+  publish-multus-lib:
+    name: Publish IP Router library
+    needs:
+      - ip-router-lib-needs-publishing
+    uses: canonical/sdcore-github-workflows/.github/workflows/publish-lib.yaml@main
+    with:
+      lib-name: "charms.ip_router_interface.v0.ip_router_interface"
+    secrets:
+      CHARMCRAFT_AUTH: ${{secrets.CHARMCRAFT_AUTH}}
