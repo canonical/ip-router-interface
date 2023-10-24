@@ -299,7 +299,7 @@ class RouterProvides(Object):
         if not self.charm.unit.is_leader():
             return
         self._sync_routing_tables()
-        new_table = self.get_flattened_routing_table()
+        new_table = self.get_routing_table()
         self.on.routing_table_updated.emit({"networks": new_table})
 
     def _router_relation_departed(self, event: RelationDepartedEvent):
@@ -309,6 +309,8 @@ class RouterProvides(Object):
         if not self.charm.unit.is_leader():
             return
         self._sync_routing_tables()
+        new_table = self.get_routing_table()
+        self.on.routing_table_updated.emit({"networks": new_table})
 
     def get_routing_table(self) -> RoutingTable:
         """Build the routing table from all of the related databags. Relations
@@ -380,7 +382,7 @@ class RouterProvides(Object):
 
     def _sync_routing_tables(self) -> None:
         """Syncs the internal routing table with all of the requirer's app databags"""
-        routing_table = self.get_flattened_routing_table()
+        routing_table = self.get_routing_table()
         for relation in self.model.relations[self.relationship_name]:
             relation.data[self.charm.app].update({"networks": json.dumps(routing_table)})
         logger.info("Resynchronized routing tables with %s", routing_table)
@@ -438,7 +440,7 @@ class RouterRequires(Object):
             raise RuntimeError("No ip-router relation exists yet.")
 
         for network_request in networks:
-            _validate_network(network_request, {"existing-networks": self.get_all_networks()})
+            _validate_network(network_request, self.get_routing_table())
 
         for relation in ip_router_relations:
             network_name = custom_network_name if custom_network_name else relation.name
@@ -448,6 +450,46 @@ class RouterRequires(Object):
             "Requested new network from the routers %s",
             str([r.name for r in ip_router_relations]),
         )
+
+    def get_routing_table(self) -> RoutingTable:
+        """Fetches combined routing tables made available by ip-router providers
+
+        Returns:
+            A list of objects of type `Network`. This list contains networks
+            from all ip-router providers that are integrated with the charm.
+        """
+        if not self.charm.unit.is_leader():
+            return
+
+        router_relations = self.model.relations.get(self.relationship_name)
+        validated_routing_table: RoutingTable = {}
+        for relation in router_relations:
+            if networks := relation.data[relation.app].get("networks"):
+                routing_table_from_databag: RoutingTable = json.loads(networks)
+                if not isinstance(json.loads(networks), dict):
+                    logger.error(
+                        "The router's routing table has been misconfigured. Can't build routing table."
+                    )
+                    return {}
+                for network_name, networks in routing_table_from_databag.items():
+                    validated_routing_table[network_name] = []
+                    for network in networks:
+                        try:
+                            _validate_network(network, validated_routing_table)
+                        except (ValueError, KeyError) as e:
+                            logger.warning(
+                                "Malformed network detected in the databag:\nNetwork: (%s)\nError: (%s)",
+                                network,
+                                e.args[0],
+                            )
+                        else:
+                            validated_routing_table[network_name].append(network)
+                logger.debug(
+                    f"Read networks from app: (%s) and relation: (%s)",
+                    relation.app.name,
+                    self.relationship_name,
+                )
+        return validated_routing_table
 
     def get_all_networks(self) -> List[Network]:
         """Fetches combined routing tables made available by ip-router providers
@@ -463,20 +505,27 @@ class RouterRequires(Object):
         all_networks = []
         for relation in router_relations:
             if networks := relation.data[relation.app].get("networks"):
-                for network in json.loads(networks):
-                    try:
-                        _validate_network(network, {"existing-networks": all_networks})
-                    except (ValueError, KeyError) as e:
-                        logger.warning(
-                            "Malformed network detected in the databag:\nNetwork: (%s)\nError: (%s)",
-                            network,
-                            e.args[0],
-                        )
-                    else:
-                        all_networks.append(network)
-            logger.debug(
-                f"Read networks from app: (%s) and relation: (%s)",
-                relation.app.name,
-                self.relationship_name,
-            )
+                routing_table_from_databag: RoutingTable = json.loads(networks)
+                if not isinstance(routing_table_from_databag, dict):
+                    logger.error(
+                        "The router's routing table has been misconfigured. Can't build routing table."
+                    )
+                    return
+                for _, networks in routing_table_from_databag.items():
+                    for network in networks:
+                        try:
+                            _validate_network(network, {"existing-networks": all_networks})
+                        except (ValueError, KeyError) as e:
+                            logger.warning(
+                                "Malformed network detected in the databag:\nNetwork: (%s)\nError: (%s)",
+                                network,
+                                e.args[0],
+                            )
+                        else:
+                            all_networks.append(network)
+                logger.debug(
+                    f"Read networks from app: (%s) and relation: (%s)",
+                    relation.app.name,
+                    self.relationship_name,
+                )
         return all_networks

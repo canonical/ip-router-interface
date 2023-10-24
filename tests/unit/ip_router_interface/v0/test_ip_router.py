@@ -4,7 +4,6 @@ import json
 import os
 import shutil
 import unittest
-from itertools import chain
 
 from ops.testing import Harness
 
@@ -60,7 +59,7 @@ class TestProvider(unittest.TestCase):
 
         expected_rt = {IP_ROUTER_REQUIRER_RELATION_NAME: network_request}
         assert self.harness.charm.RouterProvider.get_routing_table() == expected_rt
-        expected_databag = {"networks": json.dumps(network_request)}
+        expected_databag = {"networks": json.dumps(expected_rt)}
         assert (
             self.harness.get_relation_data(rel_id, self.harness.charm.app.name) == expected_databag
         )
@@ -85,7 +84,7 @@ class TestProvider(unittest.TestCase):
 
         expected_rt = {IP_ROUTER_REQUIRER_RELATION_NAME: network_request}
         assert self.harness.charm.RouterProvider.get_routing_table() == expected_rt
-        expected_databag = {"networks": json.dumps(network_request)}
+        expected_databag = {"networks": json.dumps(expected_rt)}
         assert (
             self.harness.get_relation_data(rel_id, self.harness.charm.app.name) == expected_databag
         )
@@ -106,7 +105,7 @@ class TestProvider(unittest.TestCase):
         )
         expected_rt = {IP_ROUTER_REQUIRER_RELATION_NAME: network_request}
         assert self.harness.charm.RouterProvider.get_routing_table() == expected_rt
-        expected_databag = {"networks": json.dumps(network_request)}
+        expected_databag = {"networks": json.dumps(expected_rt)}
         assert (
             self.harness.get_relation_data(rel_id, self.harness.charm.app.name) == expected_databag
         )
@@ -182,11 +181,7 @@ class TestProvider(unittest.TestCase):
             f"{IP_ROUTER_REQUIRER_RELATION_NAME}-c": network_request_c,
         }
         assert self.harness.charm.RouterProvider.get_routing_table() == expected_rt
-        expected_databag = {
-            "networks": json.dumps(
-                list(chain(network_request_a, network_request_b, network_request_c))
-            )
-        }
+        expected_databag = {"networks": json.dumps(expected_rt)}
         assert (
             self.harness.get_relation_data(rel_a_id, self.harness.charm.app.name)
             == expected_databag
@@ -216,6 +211,7 @@ class TestRequirer(unittest.TestCase):
         self.harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         assert self.harness.charm.RouterRequirer.get_all_networks() == []
+        assert self.harness.charm.RouterRequirer.get_routing_table() == {}
 
     def test_given_filled_routing_table_when_get_routing_table_then_gets_network_correctly(self):
         rel_id = self.harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
@@ -230,45 +226,16 @@ class TestRequirer(unittest.TestCase):
             {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
             {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
         ]
+        existing_rt = {IP_ROUTER_REQUIRER_RELATION_NAME: existing_network}
 
         self.harness.update_relation_data(
-            rel_id, "ip-router-provider", {"networks": json.dumps(existing_network)}
+            rel_id,
+            "ip-router-provider",
+            {"networks": json.dumps(existing_rt)},
         )
 
         assert self.harness.charm.RouterRequirer.get_all_networks() == existing_network
-
-    def test_given_two_routing_tables_when_get_routing_table_then_gets_networks_correctly(self):
-        rel_1_id = self.harness.add_relation(
-            IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider-a"
-        )
-        self.harness.add_relation_unit(rel_1_id, "ip-router-provider-a/0")
-
-        rel_2_id = self.harness.add_relation(
-            IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider-b"
-        )
-        self.harness.add_relation_unit(rel_2_id, "ip-router-provider-b/0")
-
-        existing_network_1 = [
-            {
-                "network": "192.168.250.0/24",
-                "gateway": "192.168.250.1",
-                "routes": [{"destination": "172.250.0.0/16", "gateway": "192.168.250.3"}],
-            }
-        ]
-        self.harness.update_relation_data(
-            rel_1_id, "ip-router-provider-a", {"networks": json.dumps(existing_network_1)}
-        )
-        existing_network_2 = [
-            {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
-            {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
-        ]
-        self.harness.update_relation_data(
-            rel_2_id, "ip-router-provider-b", {"networks": json.dumps(existing_network_2)}
-        )
-        assert (
-            self.harness.charm.RouterRequirer.get_all_networks()
-            == existing_network_1 + existing_network_2
-        )
+        assert self.harness.charm.RouterRequirer.get_routing_table() == existing_rt
 
     def test_given_requirer_when_request_new_network_then_produces_correct_databag(self):
         rel_id = self.harness.add_relation(IP_ROUTER_REQUIRER_RELATION_NAME, "ip-router-provider")
@@ -317,10 +284,11 @@ class TestRequirer(unittest.TestCase):
         self.harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         existing_network = [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}]
+        existing_rt = {IP_ROUTER_REQUIRER_RELATION_NAME: existing_network}
         self.harness.update_relation_data(
             rel_id,
             "ip-router-provider",
-            {"networks": json.dumps(existing_network)},
+            {"networks": json.dumps(existing_rt)},
         )
 
         network_request = [
@@ -338,8 +306,9 @@ class TestRequirer(unittest.TestCase):
         self.harness.add_relation_unit(rel_id, "ip-router-provider/0")
 
         existing_network = [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}]
+        existing_rt = {IP_ROUTER_REQUIRER_RELATION_NAME: existing_network}
         self.harness.update_relation_data(
-            rel_id, "ip-router-provider", {"networks": json.dumps(existing_network)}
+            rel_id, "ip-router-provider", {"networks": json.dumps(existing_rt)}
         )
 
         network_request = [
