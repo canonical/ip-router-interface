@@ -19,7 +19,7 @@ jobs:
             iprouter:
               - 'lib/charms/ip_router_interface/v0/ip_router_interface.py'
 
-  publish-multus-lib:
+  publish-ip-router-lib:
     name: Publish IP Router library
     needs:
       - ip-router-lib-needs-publishing
