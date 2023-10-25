@@ -524,7 +524,7 @@ class RouterRequires(Object):
                         else:
                             all_networks.append(network)
                 logger.debug(
-                    f"Read networks from app: (%s) and relation: (%s)",
+                    "Read networks from app: (%s) and relation: (%s)",
                     relation.app.name,
                     self.relationship_name,
                 )
