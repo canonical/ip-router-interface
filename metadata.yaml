@@ -4,12 +4,3 @@ description: |
 summary: |
   Placeholder charm
 website: https://github.com/canonical/ip-router-interface
-
-containers:
-  placeholder:
-    resource: placeholder-image
-
-resources:
-  placeholder-image:
-    type: oci-image
-    description: Placeholder for OCI image
