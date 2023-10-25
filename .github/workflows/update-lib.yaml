@@ -1,0 +1,30 @@
+name: Publish Libs
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  ip-router-lib-needs-publishing:
+    runs-on: ubuntu-22.04
+    outputs:
+      needs-publishing: ${{ steps.changes.outputs.iprouter }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            iprouter:
+              - 'lib/charms/ip_router_interface/v0/ip_router_interface.py'
+
+  publish-ip-router-lib:
+    name: Publish IP Router library
+    needs:
+      - ip-router-lib-needs-publishing
+    uses: canonical/sdcore-github-workflows/.github/workflows/publish-lib.yaml@main
+    with:
+      lib-name: "charms.ip_router_interface.v0.ip_router_interface"
+    secrets:
+      CHARMCRAFT_AUTH: ${{secrets.CHARMCRAFT_AUTH}}
