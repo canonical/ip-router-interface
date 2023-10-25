@@ -455,8 +455,7 @@ class RouterRequires(Object):
         """Fetches combined routing tables made available by ip-router providers
 
         Returns:
-            A list of objects of type `Network`. This list contains networks
-            from all ip-router providers that are integrated with the charm.
+            An object of type `RoutingTable` as defined in this file.
         """
         if not self.charm.unit.is_leader():
             return
