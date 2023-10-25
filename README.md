@@ -1,9 +1,11 @@
 # ip-router-interface
 
-Charmhub package name: ip-router-interface
-More information: https://charmhub.io/ip-router-interface
+Charm Relation Interface library used by charms claiming to provide or consume IP routes.
 
-This charm provides a library to help implement the ip-router specification described in 
-[TE019](https://docs.google.com/document/d/1nJBEfPw-k9YDWpqV-qrhZnfsJXyrnrjS-Q2SNnhdPrY/edit#heading=h.u8vycq1wj6a)
-It also provides a basic router simulator to test and exemplify the usage of this library
+```bash
+charmcraft fetch-lib charms.ip_router_interface.v0.ip_router_interface
+```
 
+## Reference
+
+- [IP Router interface definition](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ip_router/v0)
