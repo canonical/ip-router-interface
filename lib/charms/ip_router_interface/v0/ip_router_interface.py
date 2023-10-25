@@ -485,7 +485,7 @@ class RouterRequires(Object):
                         else:
                             validated_routing_table[network_name].append(network)
                 logger.debug(
-                    f"Read networks from app: (%s) and relation: (%s)",
+                    "Read networks from app: (%s) and relation: (%s)",
                     relation.app.name,
                     self.relationship_name,
                 )
