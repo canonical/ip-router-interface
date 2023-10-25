@@ -31,10 +31,10 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.RouterRequirer = RouterRequires(
-            charm=self, relationship_name=f"{IP_ROUTER_REQUIRER_RELATION_NAME}"
+            charm=self, relation_name=f"{IP_ROUTER_REQUIRER_RELATION_NAME}"
         )
         self.RouterRequirer_B = RouterRequires(
-            charm=self, relationship_name=f"{IP_ROUTER_REQUIRER_RELATION_NAME}-b"
+            charm=self, relation_name=f"{IP_ROUTER_REQUIRER_RELATION_NAME}-b"
         )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(

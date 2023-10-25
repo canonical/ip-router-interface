@@ -284,15 +284,15 @@ class RouterProvides(Object):
 
     on = RouterProviderCharmEvents()
 
-    def __init__(self, charm: CharmBase, relationship_name: str = "ip-router"):
-        super().__init__(charm, relationship_name)
+    def __init__(self, charm: CharmBase, relation_name: str = "ip-router"):
+        super().__init__(charm, relation_name)
         self.charm = charm
-        self.relationship_name = relationship_name
+        self.relation_name = relation_name
         self.framework.observe(
-            charm.on[relationship_name].relation_changed, self._router_relation_changed
+            charm.on[relation_name].relation_changed, self._router_relation_changed
         )
         self.framework.observe(
-            charm.on[relationship_name].relation_departed, self._router_relation_departed
+            charm.on[relation_name].relation_departed, self._router_relation_departed
         )
 
     def _router_relation_changed(self, event: RelationChangedEvent):
@@ -317,7 +317,7 @@ class RouterProvides(Object):
         """Build the routing table from all of the related databags. Relations
         that don't have missing or invalid network requests will be ignored.
         """
-        router_relations = self.model.relations[self.relationship_name]
+        router_relations = self.model.relations[self.relation_name]
         final_routing_table: RoutingTable = {}
         for relation in router_relations:
             new_network_name = relation.data[relation.app].get("network-name", None)
@@ -384,7 +384,7 @@ class RouterProvides(Object):
     def _sync_routing_tables(self) -> None:
         """Syncs the internal routing table with all of the requirer's app databags"""
         routing_table = self.get_routing_table()
-        for relation in self.model.relations[self.relationship_name]:
+        for relation in self.model.relations[self.relation_name]:
             relation.data[self.charm.app].update({"networks": json.dumps(routing_table)})
         logger.info("Resynchronized routing tables with %s", routing_table)
 
@@ -402,12 +402,12 @@ class RouterRequires(Object):
 
     on = RouterRequirerCharmEvents()
 
-    def __init__(self, charm: CharmBase, relationship_name: str = "ip-router"):
-        super().__init__(charm, relationship_name)
+    def __init__(self, charm: CharmBase, relation_name: str = "ip-router"):
+        super().__init__(charm, relation_name)
         self.charm = charm
-        self.relationship_name = relationship_name
+        self.relation_name = relation_name
         self.framework.observe(
-            charm.on[relationship_name].relation_changed, self._router_relation_changed
+            charm.on[relation_name].relation_changed, self._router_relation_changed
         )
 
     def _router_relation_changed(self, event: RelationChangedEvent):
@@ -436,7 +436,7 @@ class RouterRequires(Object):
         if not self.charm.unit.is_leader():
             return
 
-        ip_router_relations = self.model.relations.get(self.relationship_name)
+        ip_router_relations = self.model.relations.get(self.relation_name)
         if len(ip_router_relations) == 0:
             raise RuntimeError("No ip-router relation exists yet.")
 
@@ -461,12 +461,12 @@ class RouterRequires(Object):
         if not self.charm.unit.is_leader():
             return
 
-        router_relations = self.model.relations.get(self.relationship_name)
+        router_relations = self.model.relations.get(self.relation_name)
         validated_routing_table: RoutingTable = {}
         for relation in router_relations:
             if relation_data := relation.data[relation.app].get("networks"):
                 routing_table_from_databag: RoutingTable = json.loads(relation_data)
-                if not isinstance(json.loads(networks), dict):
+                if not isinstance(routing_table_from_databag, dict):
                     logger.error(
                         "The router's routing table has been misconfigured. Can't build routing table."
                     )
@@ -487,7 +487,7 @@ class RouterRequires(Object):
                 logger.debug(
                     "Read networks from app: (%s) and relation: (%s)",
                     relation.app.name,
-                    self.relationship_name,
+                    self.relation_name,
                 )
         return validated_routing_table
 
@@ -501,7 +501,7 @@ class RouterRequires(Object):
         if not self.charm.unit.is_leader():
             return
 
-        router_relations = self.model.relations.get(self.relationship_name)
+        router_relations = self.model.relations.get(self.relation_name)
         all_networks = []
         for relation in router_relations:
             if relation_data := relation.data[relation.app].get("networks"):
@@ -526,6 +526,6 @@ class RouterRequires(Object):
                 logger.debug(
                     "Read networks from app: (%s) and relation: (%s)",
                     relation.app.name,
-                    self.relationship_name,
+                    self.relation_name,
                 )
         return all_networks

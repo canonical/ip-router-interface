@@ -32,7 +32,7 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.RouterProvider = RouterProvides(
-            charm=self, relationship_name=IP_ROUTER_PROVIDER_RELATION_NAME
+            charm=self, relation_name=IP_ROUTER_PROVIDER_RELATION_NAME
         )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
