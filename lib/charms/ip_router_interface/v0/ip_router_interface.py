@@ -196,10 +196,11 @@ class RouterRequirerCharmEvents(ObjectEvents):
 def _validate_network(network_request: Network, existing_routing_table: RoutingTable):
     """Validates the network configuration created by the ip-router requirer
 
-    The requested network must have all of the required fields, the gateway
-    has to be located within the network, and all of the routes need to have
-    a path through the top level network. The requested network must also be
-    unassigned by the provider.
+    The requested network must have all of the required keys as indicated in the
+    Network type ('gateway' and 'network'), the gateway has to be located within
+    the network, and all of the routes need to have a path through the top level
+    network. The requested network must also be previously unassigned by the
+    provider.
 
     Args:
         network_request:
