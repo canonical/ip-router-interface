@@ -463,8 +463,8 @@ class RouterRequires(Object):
         router_relations = self.model.relations.get(self.relationship_name)
         validated_routing_table: RoutingTable = {}
         for relation in router_relations:
-            if networks := relation.data[relation.app].get("networks"):
-                routing_table_from_databag: RoutingTable = json.loads(networks)
+            if relation_data := relation.data[relation.app].get("networks"):
+                routing_table_from_databag: RoutingTable = json.loads(relation_data)
                 if not isinstance(json.loads(networks), dict):
                     logger.error(
                         "The router's routing table has been misconfigured. Can't build routing table."
@@ -503,8 +503,8 @@ class RouterRequires(Object):
         router_relations = self.model.relations.get(self.relationship_name)
         all_networks = []
         for relation in router_relations:
-            if networks := relation.data[relation.app].get("networks"):
-                routing_table_from_databag: RoutingTable = json.loads(networks)
+            if relation_data := relation.data[relation.app].get("networks"):
+                routing_table_from_databag: RoutingTable = json.loads(relation_data)
                 if not isinstance(routing_table_from_databag, dict):
                     logger.error(
                         "The router's routing table has been misconfigured. Can't build routing table."
