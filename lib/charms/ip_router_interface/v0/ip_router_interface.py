@@ -442,13 +442,19 @@ class RouterRequires(Object):
         if len(ip_router_relations) == 0:
             raise RuntimeError("No ip-router relation exists yet.")
 
-        existing_routing_table = self.get_routing_table()
-        for i, network_request in enumerate(requested_networks):
-            other_requested_networks = requested_networks[i + 1 :]
-            _validate_network(network_request, existing_routing_table)
-            _validate_network(
-                network_request, {"other-requested-networks": other_requested_networks}
+        try:
+            existing_routing_table = self.get_routing_table()
+            for i, network_request in enumerate(requested_networks):
+                other_requested_networks = requested_networks[i + 1 :]
+                _validate_network(network_request, existing_routing_table)
+                _validate_network(
+                    network_request, {"other-requested-networks": other_requested_networks}
+                )
+        except (ValueError, KeyError) as e:
+            logger.error(
+                "Exception (%s) occurred with network request. No routes were added.", e.args[0]
             )
+            return
 
         for relation in ip_router_relations:
             network_name = custom_network_name if custom_network_name else relation.name
