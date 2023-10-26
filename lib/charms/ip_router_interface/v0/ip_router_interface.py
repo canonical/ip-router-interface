@@ -89,7 +89,7 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         self.RouterRequirer = RouterRequires(charm=self)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.ip_router_relation_joined, self._on_relation_joined)
-        self.framework.observe(self.RouterProvider.on.routing_table_updated, self._routing_table_updated)
+        self.framework.observe(self.RouterRequirer.on.routing_table_updated, self._routing_table_updated)
 
         self.framework.observe(self.on.get_all_networks_action, self._action_get_all_networks)
         self.framework.observe(self.on.request_network_action, self._action_request_network)
@@ -411,7 +411,7 @@ class RouterRequires(Object):
         )
 
     def _router_relation_changed(self, event: RelationChangedEvent):
-        new_table = self.get_all_networks()
+        new_table = self.get_routing_table()
         self.on.routing_table_updated.emit({"networks": new_table})
 
     def request_network(self, networks: List[Network], custom_network_name: str = None) -> None:
