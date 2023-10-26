@@ -454,7 +454,7 @@ class RouterRequires(Object):
             logger.error(
                 "Exception (%s) occurred with network request. No routes were added.", e.args[0]
             )
-            return
+            raise
 
         for relation in ip_router_relations:
             network_name = custom_network_name if custom_network_name else relation.name
