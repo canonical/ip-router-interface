@@ -444,7 +444,7 @@ class RouterRequires(Object):
 
         existing_routing_table = self.get_routing_table()
         for i, network_request in enumerate(requested_networks):
-            other_requested_networks = requested_networks[:i] + requested_networks[i + 1 :]
+            other_requested_networks = requested_networks[i + 1 :]
             _validate_network(network_request, existing_routing_table)
             _validate_network(
                 network_request, {"other-requested-networks": other_requested_networks}
