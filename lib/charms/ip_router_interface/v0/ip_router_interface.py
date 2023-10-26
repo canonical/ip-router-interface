@@ -414,7 +414,9 @@ class RouterRequires(Object):
         new_table = self.get_routing_table()
         self.on.routing_table_updated.emit({"networks": new_table})
 
-    def request_network(self, networks: List[Network], custom_network_name: str = None) -> None:
+    def request_network(
+        self, requested_networks: List[Network], custom_network_name: str = None
+    ) -> None:
         """Requests a new network interface from the ip-router provider
 
         The interfaces must be valid according to `_network_is_valid`. Multiple
@@ -441,8 +443,8 @@ class RouterRequires(Object):
             raise RuntimeError("No ip-router relation exists yet.")
 
         existing_routing_table = self.get_routing_table()
-        for i, network_request in enumerate(networks):
-            other_requested_networks = networks[:i] + networks[i + 1 :]
+        for i, network_request in enumerate(requested_networks):
+            other_requested_networks = requested_networks[:i] + requested_networks[i + 1 :]
             _validate_network(network_request, existing_routing_table)
             _validate_network(
                 network_request, {"other-requested-networks": other_requested_networks}
@@ -450,7 +452,7 @@ class RouterRequires(Object):
 
         for relation in ip_router_relations:
             network_name = custom_network_name if custom_network_name else relation.name
-            relation.data[self.charm.app].update({"networks": json.dumps(networks)})
+            relation.data[self.charm.app].update({"networks": json.dumps(requested_networks)})
             relation.data[self.charm.app].update({"network-name": network_name})
         logger.debug(
             "Requested new network from the routers %s",
