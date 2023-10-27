@@ -54,7 +54,6 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         # Process the networks however you like
         implement_networks(all_networks)
         
-        
     def _action_get_routing_table(self, event: ops.ActionEvent):
         all_networks = self.RouterProvider.get_flattened_routing_table()
         event.set_results({"msg": json.dumps(all_networks)})
@@ -444,6 +443,7 @@ class RouterRequires(Object):
 
         try:
             existing_routing_table = self.get_routing_table()
+            existing_routing_table.pop(custom_network_name, None)
             for i, network_request in enumerate(requested_networks):
                 other_requested_networks = requested_networks[i + 1 :]
                 _validate_network(network_request, existing_routing_table)
