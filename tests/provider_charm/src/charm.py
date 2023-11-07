@@ -39,9 +39,6 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
             self.on[IP_ROUTER_PROVIDER_RELATION_NAME].relation_joined, self._on_relation_joined
         )
         self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
-        self.framework.observe(
-            self.on.get_flattened_routing_table_action, self._action_get_flattened_routing_table
-        )
 
     def _on_install(self, event: ops.InstallEvent):
         self.unit.status = ops.BlockedStatus("Waiting for relation to be created")
