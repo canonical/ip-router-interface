@@ -142,7 +142,7 @@ class TestIntegration:
             timeout=1000,
         )
         provider_unit = ops_test.model.units[f"{IP_ROUTER_PROVIDER_APP_NAME}/0"]
-        expected_rt = {"example-host": {"network": "192.168.250.0/24", "gateway": "192.168.250.1"}}
+        expected_rt = {"network-a": {"network": "192.168.250.0/24", "gateway": "192.168.250.1"}}
         await validate_routing_table(provider_unit, expected_rt, ops_test)
 
         requirer_unit_1 = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}/0"]
@@ -150,7 +150,7 @@ class TestIntegration:
 
         # requirer1 sends a network request
         requested_network = {
-            "example-host": {"network": "192.168.251.0/24", "gateway": "192.168.251.1"}
+            "network-b": {"network": "192.168.251.0/24", "gateway": "192.168.251.1"}
         }
         await requirer_unit_1.run_action(
             action_name="request-network", network=json.dumps(requested_network)
@@ -169,13 +169,13 @@ class TestIntegration:
 
         # assert there is a new network in all charms
         expected_rt = {
-            "example-host": [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}],
+            "network-b": {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
         }
         await validate_routing_table(provider_unit, expected_rt, ops_test)
 
         # requirer2 sends a network request
         requested_network = {
-            "example-host-b": {"network": "192.168.252.0/24", "gateway": "192.168.252.1"}
+            "network-c": {"network": "192.168.252.0/24", "gateway": "192.168.252.1"}
         }
         await requirer_unit_2.run_action(
             action_name="request-network", network=json.dumps(requested_network)
@@ -193,8 +193,8 @@ class TestIntegration:
         )
 
         expected_rt = {
-            "example-host": {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
-            "example-host-b": {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
+            "network-b": {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
+            "network-c": {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
         }
 
         await validate_routing_table(provider_unit, expected_rt, ops_test)
