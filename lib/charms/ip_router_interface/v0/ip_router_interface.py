@@ -492,10 +492,12 @@ class RouterRequires(Object):
                 )
         return validated_routing_table
 
-    def get_network(self, network_name: str):
+    def get_network(self, network_name: str) -> Network:
         """Fetches the network configuration of a specific network.
 
         Args:
             network_name:
-                The requested network name"""
+                The requested network name
+        Returns:
+            An object of type Network"""
         return self.get_routing_table()[network_name]
