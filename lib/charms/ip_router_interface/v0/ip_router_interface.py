@@ -106,11 +106,11 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
 
     def _routing_table_updated(self, event: RoutingTableUpdatedEvent):
         # Get and process all of the available networks when they're updated
-        all_networks = self.RouterRequirer.get_all_networks()
+        all_networks = self.RouterRequirer.get_routing_table()
 
     def _action_get_all_networks(self, event: ops.ActionEvent):
         # Get and process all of the available networks any time you like
-        all_networks = self.RouterRequirer.get_all_networks()
+        all_networks = self.RouterRequirer.get_routing_table()
         event.set_results({"msg": json.dumps(all_networks)})
 
     def _action_request_network(self, event: ops.ActionEvent):
