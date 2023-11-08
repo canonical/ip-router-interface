@@ -129,7 +129,7 @@ class TestIntegration:
             timeout=1000,
         )
         await ops_test.model.integrate(
-            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-b:{IP_ROUTER_REQUIRER_RELATION_NAME}-b",
+            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-b:{IP_ROUTER_REQUIRER_RELATION_NAME}",
             relation2=f"{IP_ROUTER_PROVIDER_APP_NAME}:{IP_ROUTER_PROVIDER_RELATION_NAME}",
         )
         await ops_test.model.wait_for_idle(

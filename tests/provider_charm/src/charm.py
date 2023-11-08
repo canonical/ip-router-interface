@@ -50,10 +50,6 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         rt = self.RouterProvider.get_routing_table()
         event.set_results({"msg": json.dumps(rt)})
 
-    def _action_get_flattened_routing_table(self, event: ops.ActionEvent):
-        rt = self.RouterProvider.get_flattened_routing_table()
-        event.set_results({"msg": json.dumps(rt)})
-
 
 if __name__ == "__main__":
     ops.main.main(SimpleIPRouteProviderCharm)
