@@ -499,5 +499,8 @@ class RouterRequires(Object):
             network_name:
                 The requested network name
         Returns:
-            An object of type Network"""
+            An object of type Network
+        Raises:
+            KeyError: 
+               Will raise if the network_name does not yet exist in the routing table"""
         return self.get_routing_table()[network_name]
