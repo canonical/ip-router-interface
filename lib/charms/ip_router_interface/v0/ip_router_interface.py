@@ -15,26 +15,32 @@ charmcraft fetch-lib charms.ip_router_interface.v0.ip_router_interface
 ```
 
 ### Provider charm
-This example provider charm is all we need to listen to ip-router requirer requests.
-The ip-router provider fulfills the routing function for multiple charms that are
-requirers of the ip-router interface. For that reason, this charm will continuously
-track and update all of the connected requirers and the networks and routes they've 
-requested, which it does in a routing table. As new charms are connected and disconnected
-to the relation, this routing table is automatically adds and removes the dependent
-networks.
+This example provider charm shows how the library could be utilized to provide
+ip routing functionality. From the point of view of the provider charm, it's possible to:
 
-The library handles the listening and synchronization for all of the ip-router network
-requests internally, which means as the charm author you don't need to worry about any
-of the business logic of validating or orchestrating the relation network.
+* Return the live routing table,
+* Observe whenever the routing table is updated
 
-You can also listen to the `routing_table_updated` event that is emitted after the 
-tables are synced.
+The library itself takes care of adding, removing, updating the networks requested,
+and the synchronization of the routing table between the requirers,
+which means as the author of the provider charm, there is no need to handle the 
+logic of the objects of type Network. 
 
+When reading the routing table directly, the following are guaranteed by the 
+library:
+
+* The networks that are available in the routing table are:
+    * Unique,
+    * Valid as described by the function _validate_network,
+    * Associated with a single requirer application
+
+You can also listen to the `routing_table_updated` event that is emitted after all of
+ the tables are synced, which guarantees that the routing table is updated at the moment.
 
 ```python
 import logging, json
 import ops
-from charms.ip_router_interface.v0.ip_router_interface import *
+from charms.ip_router_interface.v0.ip_router_interface import RouterProvides
 
 class SimpleIPRouteProviderCharm(ops.CharmBase):
 
@@ -49,17 +55,15 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus("Ready to Provide")
 
     def _routing_table_updated(self, event: RoutingTableUpdatedEvent):
+        # The table can be used automatically after updating 
         routing_table = event.routing_table
-
-        # Process the networks however you like
-        implement_networks(all_networks)
-        
+        implement_networks(routing_table)
         
     def _action_get_routing_table(self, event: ops.ActionEvent):
-        all_networks = self.RouterProvider.get_flattened_routing_table()
+        # The table can be used on-demand
+        all_networks = self.RouterProvider.get_routing_table()
         event.set_results({"msg": json.dumps(all_networks)})
     
-
 
 if __name__ == "__main__":  # pragma: nocover
     ops.main(SimpleIPRouteProviderCharm)  # type: ignore
@@ -89,7 +93,7 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         self.RouterRequirer = RouterRequires(charm=self)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.ip_router_relation_joined, self._on_relation_joined)
-        self.framework.observe(self.RouterProvider.on.routing_table_updated, self._routing_table_updated)
+        self.framework.observe(self.RouterRequirer.on.routing_table_updated, self._routing_table_updated)
 
         self.framework.observe(self.on.get_all_networks_action, self._action_get_all_networks)
         self.framework.observe(self.on.request_network_action, self._action_request_network)
@@ -102,11 +106,11 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
 
     def _routing_table_updated(self, event: RoutingTableUpdatedEvent):
         # Get and process all of the available networks when they're updated
-        all_networks = self.RouterRequirer.get_all_networks()
+        all_networks = self.RouterRequirer.get_routing_table()
 
     def _action_get_all_networks(self, event: ops.ActionEvent):
         # Get and process all of the available networks any time you like
-        all_networks = self.RouterRequirer.get_all_networks()
+        all_networks = self.RouterRequirer.get_routing_table()
         event.set_results({"msg": json.dumps(all_networks)})
 
     def _action_request_network(self, event: ops.ActionEvent):
@@ -135,7 +139,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 from ipaddress import IPv4Address, IPv4Network
 from typing import Dict, List, Union, TypeAlias
@@ -163,10 +167,7 @@ Network: TypeAlias = Dict[
     ],
 ]
 
-RoutingTable: TypeAlias = Dict[
-    str,  # Name of the application
-    List[Network],  # All networks for this application
-]
+RoutingTable: TypeAlias = Dict[str, Network]  # Name of the network  # A Dict of type Network
 
 
 class RoutingTableUpdatedEvent(EventBase):
@@ -196,17 +197,18 @@ class RouterRequirerCharmEvents(ObjectEvents):
 def _validate_network(network_request: Network, existing_routing_table: RoutingTable):
     """Validates the network configuration created by the ip-router requirer
 
-    The requested network must have all of the required fields, the gateway
-    has to be located within the network, and all of the routes need to have
-    a path through the top level network. The requested network must also be
-    unassigned by the provider.
+    The requested network must have all of the required keys as indicated in the
+    Network type ('gateway' and 'network'), the gateway has to be located within
+    the network, and all of the routes need to have a path through the top level
+    network. The requested network must also be previously unassigned by the
+    provider.
 
     Args:
         network_request:
             An object of type `Network` that will be validated.
-        new_networks:
-            The rest of the networks to check if this one is mutually
-            exclusive to the rest of the subnets.
+        existing_routing_table:
+            The existing routing table. The given network will be checked to see
+            if it could be added to this object.
 
     Raises:
         ValueError:
@@ -238,32 +240,18 @@ def _validate_network(network_request: Network, existing_routing_table: RoutingT
         if route_gateway not in network:
             raise ValueError("There is no route to this destination from the network.")
 
-    for existing_network_list in existing_routing_table.values():
-        for existing_network in existing_network_list:
-            old_subnet = IPv4Network(existing_network["network"])
-            new_subnet = IPv4Network(network_request["network"])
+    for existing_network in existing_routing_table.values():
+        old_subnet = IPv4Network(existing_network["network"])
+        new_subnet = IPv4Network(network_request["network"])
 
-            if old_subnet.subnet_of(new_subnet) or old_subnet.supernet_of(new_subnet):
-                raise ValueError("This network has been defined in a previous entry.")
-
-
-def _network_name_taken(name: str, relations: List[Relation]) -> bool:
-    count = 0
-    for relation in relations:
-        if name == relation.data[relation.app].get("network-name"):
-            count += 1
-
-    if count > 1:
-        logger.error(
-            "There are multiple relations with the name (%s). Please change one or provide a custom network name.",
-            name,
-        )
-        return True
-    return False
+        if old_subnet.subnet_of(new_subnet) or old_subnet.supernet_of(new_subnet):
+            raise ValueError("This network has been defined in a previous entry.")
 
 
 class RouterProvides(Object):
-    """This class is used to manage the routing table of the router provider.
+    """This class is initialized by the ip-router provider to automatically
+    accept new network requests from ip-router requirers and synchronize all
+    requirers' databags with the new network topology.
 
     It's capabilities are to:
     * Build a Routing Table from all of the databags of the requirers with their
@@ -275,76 +263,98 @@ class RouterProvides(Object):
     Attributes:
         charm:
             The Charm object that instantiates this class.
-        relationship_name:
-            The name used for the relationship implementing the ip-router interface.
+        relation_name:
+            The name used for the relation implementing the ip-router interface.
             All requirers that integrate to this name are grouped into one routing table.
             "ip-router" by default.
     """
 
     on = RouterProviderCharmEvents()
 
-    def __init__(self, charm: CharmBase, relationship_name: str = "ip-router"):
-        super().__init__(charm, relationship_name)
+    def __init__(self, charm: CharmBase, relation_name: str = "ip-router"):
+        super().__init__(charm, relation_name)
         self.charm = charm
-        self.relationship_name = relationship_name
+        self.relation_name = relation_name
         self.framework.observe(
-            charm.on[relationship_name].relation_changed, self._router_relation_changed
+            charm.on[relation_name].relation_changed, self._router_relation_changed
         )
         self.framework.observe(
-            charm.on[relationship_name].relation_departed, self._router_relation_departed
+            charm.on[relation_name].relation_departed, self._router_relation_departed
         )
 
     def _router_relation_changed(self, event: RelationChangedEvent):
-        """Resync the databags since there could have been a change in networks."""
+        """Update and sync the routing tables when a databag changes."""
         if not self.charm.unit.is_leader():
             return
         self._sync_routing_tables()
-        new_table = self.get_flattened_routing_table()
+        new_table = self.get_routing_table()
         self.on.routing_table_updated.emit({"networks": new_table})
 
     def _router_relation_departed(self, event: RelationDepartedEvent):
-        """If an application has completely departed the relation, remove it
-        from the routing table.
-        """
+        """Update and sync the routing tables if an application leaves."""
         if not self.charm.unit.is_leader():
             return
         self._sync_routing_tables()
+        new_table = self.get_routing_table()
+        self.on.routing_table_updated.emit({"networks": new_table})
 
     def get_routing_table(self) -> RoutingTable:
-        """Build the routing table from all of the related databags. Relations
-        that don't have missing or invalid network requests will be ignored.
-        """
-        router_relations = self.model.relations[self.relationship_name]
-        final_routing_table: RoutingTable = {}
-        for relation in router_relations:
-            new_network_name = relation.data[relation.app].get("network-name", None)
-            new_network_request: List[Network] = json.loads(
-                relation.data[relation.app].get("networks", "{}")
-            )
+        """Build the routing table by collecting network requests from all related
+        requirer databags. If there are errors or invalid network definitions in
+        the databags, they will be raised here, but must be fixed in the requirer
+        charm.
 
-            if (
-                not new_network_name
-                or not new_network_request
-                or _network_name_taken(new_network_name, router_relations)
-            ):
+        Raises:
+            JSONDecodeError:
+                The json from the databag was not decodable
+            RuntimeError:
+                There was an error with verifying the network request.
+        """
+        router_relations = self.model.relations[self.relation_name]
+        final_routing_table: RoutingTable = {}
+
+        for relation in router_relations:
+            try:
+                network_requests: RoutingTable = json.loads(
+                    relation.data[relation.app].get("networks")
+                )
+            except json.decoder.JSONDecodeError as e:
+                logger.error(
+                    "Failed parsing JSON from app %s databag. Skipping all networks from this app. %s",
+                    relation.app.name,
+                    relation.data[relation.app],
+                )
+                continue
+            except TypeError as e:
                 continue
 
-            final_routing_table[new_network_name] = []
-
-            for network in new_network_request:
-                try:
-                    _validate_network(network, final_routing_table)
-                except (ValueError, KeyError) as e:
-                    logger.error(
-                        "Exception (%s) occurred with network %s. Skipping this entry.",
-                        e.args[0],
-                        network,
+            for new_network_name, new_network in network_requests.items():
+                if not new_network_name or not new_network:
+                    continue
+                if new_network_name in final_routing_table.keys():
+                    error_string = (
+                        "Duplicate network name %s detected at least from second application %s, probably due to a race condition. Please make sure your network names are unique between applications.",
+                        new_network_name,
+                        relation.app.name,
                     )
+                    logger.error(error_string)
+                    raise RuntimeError(error_string)
+
+                try:
+                    _validate_network(new_network, final_routing_table)
+                except (ValueError, KeyError) as e:
+                    error_string = (
+                        "Exception (%s) occurred with network %s. This exception should be fixed at the requirer side.",
+                        e.args[0],
+                        new_network,
+                    )
+                    logger.error(error_string)
+                    raise RuntimeError(error_string)
                 else:
-                    final_routing_table[new_network_name].append(network)
+                    final_routing_table[new_network_name] = new_network
                     logger.debug(
                         "Added (%s) from app:(%s) with relation-name:(%s)",
-                        new_network_request,
+                        new_network_name,
                         relation.app.name,
                         new_network_name,
                     )
@@ -352,131 +362,145 @@ class RouterProvides(Object):
         logger.debug("Generated rt: %s", final_routing_table)
         return final_routing_table
 
-    def get_flattened_routing_table(self) -> List[Network]:
-        """Returns a read-only routing table that's flattened to fit the specification.
-        The routing table is in the form of
-        {
-            app1_name: list_of_networks_1,
-            app2_name: list_of_networks_2,
-            ...
-        }
-
-        A flattened table looks like
-        [
-            *list_of_networks_1,
-            *list_of_networks_2,
-            ...
-        ]
-
-        Returns:
-            A list of objects of type `Network`
-        """
-        internal_routing_table = self.get_routing_table()
-        final_routing_table: List[Network] = []
-        for networks in internal_routing_table.values():
-            final_routing_table.extend(networks)
-        logger.debug("Flattened RT to %s", final_routing_table)
-        return final_routing_table
-
     def _sync_routing_tables(self) -> None:
-        """Syncs the internal routing table with all of the requirer's app databags"""
-        routing_table = self.get_flattened_routing_table()
-        for relation in self.model.relations[self.relationship_name]:
+        """Syncs the internal routing table with all of the requirer's app databags."""
+        routing_table = self.get_routing_table()
+        for relation in self.model.relations[self.relation_name]:
             relation.data[self.charm.app].update({"networks": json.dumps(routing_table)})
         logger.info("Resynchronized routing tables with %s", routing_table)
 
 
 class RouterRequires(Object):
-    """ip-router requirer class to be instantiated by charms that require routing
+    """This class is used by ip-router requirers to create new network requests.
+    This requested network will be uniquely assigned to the requirer that created
+    it by the router provider, and it will also be broadcast to all of the other
+    ip-router requirer's databags by the ip-router provider.
 
-    This class provides methods to request a new network, and read the available
-    network from the router providers. These should be used exclusively to
-    interact with the relation.
+    At the same time, this class also provides the ability to get all of the other
+    networks that were assigned by the ip-router provider. A collective routing
+    table is created by the ip-router provider, which can be accessed at any
+    time from this class, or from listening to the `routing_table_updated` event.
+
+    This library can be used to share a routing table with assigned IP's between
+    multiple requirer charms, but the actual implementation of the pathing between
+    IP's is left to the provider and requirer charms themselves.
 
     Attributes:
-        charm: The Charm object that instantiates this class.
+        charm:
+            The Charm object that instantiates this class.
+        relation_name:
+            The name used for the relation implementing the ip-router interface.
     """
 
     on = RouterRequirerCharmEvents()
 
-    def __init__(self, charm: CharmBase, relationship_name: str = "ip-router"):
-        super().__init__(charm, relationship_name)
+    def __init__(self, charm: CharmBase, relation_name: str = "ip-router"):
+        super().__init__(charm, relation_name)
         self.charm = charm
-        self.relationship_name = relationship_name
+        self.relation_name = relation_name
         self.framework.observe(
-            charm.on[relationship_name].relation_changed, self._router_relation_changed
+            charm.on[relation_name].relation_changed, self._router_relation_changed
         )
 
     def _router_relation_changed(self, event: RelationChangedEvent):
-        new_table = self.get_all_networks()
+        new_table = self.get_routing_table()
         self.on.routing_table_updated.emit({"networks": new_table})
 
-    def request_network(self, networks: List[Network], custom_network_name: str = None) -> None:
-        """Requests a new network interface from the ip-router provider
-
-        The interfaces must be valid according to `_network_is_valid`. Multiple
+    def request_network(self, requested_networks: RoutingTable) -> None:
+        """Requests a set of new networks from the ip-router provider. Multiple
         calls to this function will replace the previously requested networks,
-        so all of the networks required must be given with each call.
+        so all of the networks required must be given with each call. If successful,
+        the provider will reserve this network for the charm and broadcast the
+        availability of this network to all other requirers.
 
         Arguments:
-            networks:
-                A list containing the desired networks of the type `Network`.
-            custom_network_name:
-                A string to use as the name of the network. Defaults to the relation
-                name.
+            requested_networks:
+                An object of type RoutingTable that the requirer wants from the
+                router to assign to itself, as well as broadcast to other requirers.
 
         Raises:
-            RuntimeError:
-                No ip-router relation exists yet or validation of one
-            or more of the networks failed.
+            ValueError:
+                Validation of one or more of the networks failed.
+            KeyError:
+                Validation of one or more of the networks failed.
         """
         if not self.charm.unit.is_leader():
             return
 
-        ip_router_relations = self.model.relations.get(self.relationship_name)
+        ip_router_relations = self.model.relations.get(self.relation_name)
         if len(ip_router_relations) == 0:
-            raise RuntimeError("No ip-router relation exists yet.")
+            return
 
-        for network_request in networks:
-            _validate_network(network_request, {"existing-networks": self.get_all_networks()})
+        existing_routing_table = self.get_routing_table()
+        [existing_routing_table.pop(key, None) for key in requested_networks.keys()]
+
+        for network_name, network_request in requested_networks.items():
+            try:
+                _validate_network(network_request, existing_routing_table)
+            except (ValueError, KeyError) as e:
+                logger.error(
+                    "Exception (%s) occurred with network request. No routes were added.",
+                    e.args[0],
+                )
+                raise
+            else:
+                existing_routing_table[network_name] = network_request
 
         for relation in ip_router_relations:
-            network_name = custom_network_name if custom_network_name else relation.name
-            relation.data[self.charm.app].update({"networks": json.dumps(networks)})
-            relation.data[self.charm.app].update({"network-name": network_name})
+            relation.data[self.charm.app].update({"networks": json.dumps(requested_networks)})
         logger.debug(
             "Requested new network from the routers %s",
             str([r.name for r in ip_router_relations]),
         )
 
-    def get_all_networks(self) -> List[Network]:
+    def get_routing_table(self) -> RoutingTable:
         """Fetches combined routing tables made available by ip-router providers
 
         Returns:
-            A list of objects of type `Network`. This list contains networks
-            from all ip-router providers that are integrated with the charm.
+            An object of type `RoutingTable` as defined in this file.
         """
         if not self.charm.unit.is_leader():
             return
 
-        router_relations = self.model.relations.get(self.relationship_name)
-        all_networks = []
+        router_relations = self.model.relations.get(self.relation_name)
+        validated_routing_table: RoutingTable = {}
         for relation in router_relations:
-            if networks := relation.data[relation.app].get("networks"):
-                for network in json.loads(networks):
+            if relation_data := relation.data[relation.app].get("networks"):
+                try:
+                    routing_table_from_databag: RoutingTable = json.loads(relation_data)
+                except json.decoder.JSONDecodeError:
+                    logger.error(
+                        "The router's databag has been misconfigured. Can't build routing table."
+                    )
+                    return {}
+
+                for network_name, network_entry in routing_table_from_databag.items():
                     try:
-                        _validate_network(network, {"existing-networks": all_networks})
+                        _validate_network(network_entry, validated_routing_table)
                     except (ValueError, KeyError) as e:
                         logger.warning(
                             "Malformed network detected in the databag:\nNetwork: (%s)\nError: (%s)",
-                            network,
+                            network_entry,
                             e.args[0],
                         )
                     else:
-                        all_networks.append(network)
-            logger.debug(
-                f"Read networks from app: (%s) and relation: (%s)",
-                relation.app.name,
-                self.relationship_name,
-            )
-        return all_networks
+                        validated_routing_table[network_name] = network_entry
+                logger.debug(
+                    "Read networks from app: (%s) and relation: (%s)",
+                    relation.app.name,
+                    self.relation_name,
+                )
+        return validated_routing_table
+
+    def get_network(self, network_name: str) -> Network:
+        """Fetches the network configuration of a specific network.
+
+        Args:
+            network_name:
+                The requested network name
+        Returns:
+            An object of type Network
+        Raises:
+            KeyError: 
+               Will raise if the network_name does not yet exist in the routing table"""
+        return self.get_routing_table()[network_name]

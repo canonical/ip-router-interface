@@ -31,18 +31,11 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.RouterRequirer = RouterRequires(
-            charm=self, relationship_name=f"{IP_ROUTER_REQUIRER_RELATION_NAME}"
-        )
-        self.RouterRequirer_B = RouterRequires(
-            charm=self, relationship_name=f"{IP_ROUTER_REQUIRER_RELATION_NAME}-b"
+            charm=self, relation_name=f"{IP_ROUTER_REQUIRER_RELATION_NAME}"
         )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
             self.on[IP_ROUTER_REQUIRER_RELATION_NAME].relation_joined,
-            self._on_relation_joined,
-        )
-        self.framework.observe(
-            self.on[f"{IP_ROUTER_REQUIRER_RELATION_NAME}-b"].relation_joined,
             self._on_relation_joined,
         )
 
@@ -56,17 +49,11 @@ class SimpleIPRouteRequirerCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus("Ready to Require")
 
     def _action_get_routing_table(self, event: ops.ActionEvent):
-        if self.app.name[-1] == "b":
-            rt = self.RouterRequirer_B.get_all_networks()
-        else:
-            rt = self.RouterRequirer.get_all_networks()
+        rt = self.RouterRequirer.get_all_networks()
         event.set_results({"msg": json.dumps(rt)})
 
     def _action_request_network(self, event: ops.ActionEvent):
-        if self.app.name[-1] == "b":
-            self.RouterRequirer_B.request_network(json.loads(event.params["network"]))
-        else:
-            self.RouterRequirer.request_network(json.loads(event.params["network"]))
+        self.RouterRequirer.request_network(json.loads(event.params["network"]))
         event.set_results({"msg": "ok"})
 
 
