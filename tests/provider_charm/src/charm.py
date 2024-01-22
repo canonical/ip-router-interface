@@ -32,16 +32,13 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.RouterProvider = RouterProvides(
-            charm=self, relationship_name=IP_ROUTER_PROVIDER_RELATION_NAME
+            charm=self, relation_name=IP_ROUTER_PROVIDER_RELATION_NAME
         )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
             self.on[IP_ROUTER_PROVIDER_RELATION_NAME].relation_joined, self._on_relation_joined
         )
         self.framework.observe(self.on.get_routing_table_action, self._action_get_routing_table)
-        self.framework.observe(
-            self.on.get_flattened_routing_table_action, self._action_get_flattened_routing_table
-        )
 
     def _on_install(self, event: ops.InstallEvent):
         self.unit.status = ops.BlockedStatus("Waiting for relation to be created")
@@ -51,10 +48,6 @@ class SimpleIPRouteProviderCharm(ops.CharmBase):
 
     def _action_get_routing_table(self, event: ops.ActionEvent):
         rt = self.RouterProvider.get_routing_table()
-        event.set_results({"msg": json.dumps(rt)})
-
-    def _action_get_flattened_routing_table(self, event: ops.ActionEvent):
-        rt = self.RouterProvider.get_flattened_routing_table()
         event.set_results({"msg": json.dumps(rt)})
 
 

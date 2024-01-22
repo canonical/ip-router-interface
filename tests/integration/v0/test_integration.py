@@ -87,7 +87,9 @@ class TestIntegration:
         requirer_unit = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}/0"]
 
         # Run a "request-network" action on the requirer charm
-        requested_network = [{"network": "192.168.250.0/24", "gateway": "192.168.250.1"}]
+        requested_network = {
+            "network-a": {"network": "192.168.250.0/24", "gateway": "192.168.250.1"}
+        }
         action = await requirer_unit.run_action(
             action_name="request-network", network=json.dumps(requested_network)
         )
@@ -105,7 +107,7 @@ class TestIntegration:
 
         # Run a "get-routing-table" action on the provider charm
         provider_unit = ops_test.model.units[f"{IP_ROUTER_PROVIDER_APP_NAME}/0"]
-        action = await provider_unit.run_action(action_name="get-flattened-routing-table")
+        action = await provider_unit.run_action(action_name="get-routing-table")
         action_output = await ops_test.model.get_action_output(
             action_uuid=action.entity_id, wait=60
         )
@@ -127,7 +129,7 @@ class TestIntegration:
             timeout=1000,
         )
         await ops_test.model.integrate(
-            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-b:{IP_ROUTER_REQUIRER_RELATION_NAME}-b",
+            relation1=f"{IP_ROUTER_REQUIRER_APP_NAME}-b:{IP_ROUTER_REQUIRER_RELATION_NAME}",
             relation2=f"{IP_ROUTER_PROVIDER_APP_NAME}:{IP_ROUTER_PROVIDER_RELATION_NAME}",
         )
         await ops_test.model.wait_for_idle(
@@ -140,16 +142,16 @@ class TestIntegration:
             timeout=1000,
         )
         provider_unit = ops_test.model.units[f"{IP_ROUTER_PROVIDER_APP_NAME}/0"]
-        expected_rt = {
-            "example-host": [{"network": "192.168.250.0/24", "gateway": "192.168.250.1"}]
-        }
+        expected_rt = {"network-a": {"network": "192.168.250.0/24", "gateway": "192.168.250.1"}}
         await validate_routing_table(provider_unit, expected_rt, ops_test)
 
         requirer_unit_1 = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}/0"]
         requirer_unit_2 = ops_test.model.units[f"{IP_ROUTER_REQUIRER_APP_NAME}-b/0"]
 
         # requirer1 sends a network request
-        requested_network = [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}]
+        requested_network = {
+            "network-b": {"network": "192.168.251.0/24", "gateway": "192.168.251.1"}
+        }
         await requirer_unit_1.run_action(
             action_name="request-network", network=json.dumps(requested_network)
         )
@@ -166,18 +168,15 @@ class TestIntegration:
         )
 
         # assert there is a new network in all charms
-        expected_flat_table = [
-            {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
-        ]
         expected_rt = {
-            "example-host": [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}],
+            "network-b": {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
         }
         await validate_routing_table(provider_unit, expected_rt, ops_test)
-        await validate_routing_table(requirer_unit_1, expected_flat_table, ops_test)
-        await validate_routing_table(requirer_unit_2, expected_flat_table, ops_test)
 
         # requirer2 sends a network request
-        requested_network = [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}]
+        requested_network = {
+            "network-c": {"network": "192.168.252.0/24", "gateway": "192.168.252.1"}
+        }
         await requirer_unit_2.run_action(
             action_name="request-network", network=json.dumps(requested_network)
         )
@@ -193,15 +192,9 @@ class TestIntegration:
             timeout=1000,
         )
 
-        expected_flat_table = [
-            {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
-            {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
-        ]
         expected_rt = {
-            "example-host": [{"network": "192.168.251.0/24", "gateway": "192.168.251.1"}],
-            "example-host-b": [{"network": "192.168.252.0/24", "gateway": "192.168.252.1"}],
+            "network-b": {"network": "192.168.251.0/24", "gateway": "192.168.251.1"},
+            "network-c": {"network": "192.168.252.0/24", "gateway": "192.168.252.1"},
         }
 
         await validate_routing_table(provider_unit, expected_rt, ops_test)
-        await validate_routing_table(requirer_unit_1, expected_flat_table, ops_test)
-        await validate_routing_table(requirer_unit_2, expected_flat_table, ops_test)
